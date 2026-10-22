@@ -1,12 +1,13 @@
 /*
   RaceNotes service worker — makes the app open offline.
   VERSION HISTORY (newest first)
+  v1.1.0  2026-10-22  Cache bump for the entry list change.
   v1.0.0  2026-10-21  First build: app shell, logos and icons cached on install;
                       PDF and ZIP libraries cached right after; fonts cached
                       the first time they're used.
   Bump CACHE when shipping a new version so phones pick up the update.
 */
-const CACHE = "racenotes-v1.0.0";
+const CACHE = "racenotes-v1.1.0";
 const SHELL = ["./", "index.html", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png",
   "brand/logo-horizontal.svg", "brand/logo-horizontal-white.svg", "brand/symbol.svg"];

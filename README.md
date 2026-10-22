@@ -1,12 +1,13 @@
 <!--
   VERSION HISTORY (newest first)
+  v1.1.0  2026-10-22  Current version line updated.
   v1.0.0  2026-10-21  First README.
 -->
 # RaceNotes
 
 Log your go-kart race nights: one entry per session with results, handling, track conditions and
 your full setup (gearing, tire pressures, corner weights). Installs on your phone and PC and works
-offline. Current version: **v1.0.0** (see `CHANGELOG.md`).
+offline. Current version: **v1.1.0** (see `CHANGELOG.md`).
 
 ## Put it online with GitHub Pages (one time, ~5 minutes)
 

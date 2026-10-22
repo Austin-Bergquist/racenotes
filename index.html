@@ -12,6 +12,9 @@
   copying an older file over index.html. Your entries live in the
   browser's on-device storage and are NOT touched by swapping versions.
 
+  v1.1.0  2026-10-22  Entry list shows gears as teeth (e.g. 11-64) instead
+                      of the ratio, plus track condition and air temp.
+                      Search also matches gears.
   v1.0.0  2026-10-21  First build, on the Receipt Log app pattern:
                       - One entry per session (RN-0001…): date, track,
                         class, session, results, handling, conditions,
@@ -126,7 +129,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .day b{display:block;font-size:17px;color:var(--ink);font-weight:600}
 .who{min-width:0;display:flex;flex-direction:column;gap:3px}
 .title{font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
-.meta{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
 .fin{font-family:var(--font-display);font-weight:700;font-size:20px;min-width:40px;text-align:right}
 .fin.win{color:var(--accent)}
 .tag{display:inline-block;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--ink);font-size:11.5px;margin-right:4px}
@@ -299,7 +302,7 @@ footer .brand img{display:block;height:20px;width:auto}
       <source srcset="brand/logo-horizontal-white.svg" media="(prefers-color-scheme: dark)">
       <img src="brand/logo-horizontal.svg" alt="Austin Bergquist" width="202" height="20">
     </picture>
-    <div>RaceNotes <span id="ver">v1.0.0</span></div>
+    <div>RaceNotes <span id="ver">v1.1.0</span></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -315,7 +318,7 @@ window.addEventListener("error",function(e){var s=document.getElementById("statu
 <script>
 (function(){
 "use strict";
-const APP_VERSION="1.0.0";
+const APP_VERSION="1.1.0";
 const SESSIONS=["Practice","Heat","Feature","Test"];
 const HANDLING=["Tight entry","Tight center","Tight exit","Loose entry","Loose center","Loose exit","Good"];
 const CONDS=["Heavy","Tacky","Dry-slick","Wet"];
@@ -369,6 +372,7 @@ function num(s){const t=String(s==null?"":s).trim().replace(",",".");if(!t)retur
 const pct=x=>(x*100).toFixed(1)+"%";
 const lapTxt=x=>x==null?"":(+x).toFixed(3);
 const pos=x=>x==null?"–":"P"+x;
+const gearTxt=e=>e.gearDriver==null&&e.gearDriven==null?"":(e.gearDriver==null?"?":e.gearDriver)+"-"+(e.gearDriven==null?"?":e.gearDriven);
 function gearRatio(e){return e.gearDriver>0&&e.gearDriven>0?e.gearDriven/e.gearDriver:null}
 function weightStats(w){
   if(!w||CORNERS.some(k=>!(w[k]>0)))return null;
@@ -569,7 +573,7 @@ function render(){
   fillList("classList",[...new Set(entries.map(e=>e.kartClass).filter(Boolean))].sort());
   const ft=$("filterTrack"),cur=ft.value;ft.length=1;ts.forEach(t=>{const o=document.createElement("option");o.value=t;o.textContent=t;ft.appendChild(o)});ft.value=ts.includes(cur)?cur:"";
   const q=$("search").value.trim().toLowerCase(),fv=ft.value;
-  const shown=entries.filter(e=>(!fv||e.track===fv)&&(!q||[rnum(e),e.track,e.kartClass,e.session,e.trackCond,e.tires,e.setupChanges,e.notes,(e.handling||[]).join(" ")].join(" ").toLowerCase().includes(q)));
+  const shown=entries.filter(e=>(!fv||e.track===fv)&&(!q||[rnum(e),e.track,e.kartClass,e.session,e.trackCond,gearTxt(e),e.tires,e.setupChanges,e.notes,(e.handling||[]).join(" ")].join(" ").toLowerCase().includes(q)));
   const list=$("list");list.innerHTML="";
   if(!entries.length){list.innerHTML='<div class="empty">Your sessions will show up here, newest first, grouped by month. Fill in the form above and tap <b>Save entry</b>.</div>';return}
   if(!shown.length){list.innerHTML='<div class="empty">No entries match that search.</div>';return}
@@ -589,10 +593,13 @@ function render(){
       b.querySelector(".day b").textContent=d.getDate();b.querySelector(".day span").textContent=d.toLocaleDateString("en-US",{weekday:"short"});
       b.querySelector(".rnum").textContent=rnum(e);
       b.querySelector(".tn").textContent=[e.track||"(no track)",e.session,e.kartClass].filter(Boolean).join(" · ");
-      const r=gearRatio(e),s=weightStats(e.weights);
-      const meta=b.querySelector(".meta");
-      const bits=[r?r.toFixed(2)+" ratio":"",s?"Cross "+pct(s.cross):"",e.bestLap!=null?lapTxt(e.bestLap)+"s":"",(e.photoIds||[]).length?"📷 "+e.photoIds.length:""].filter(Boolean);
-      meta.textContent=bits.join(" · ");meta.classList.add("num");meta.hidden=!bits.length;
+      // v1.1.0: gears as teeth (11-64) instead of the ratio, plus track condition and air temp
+      const s=weightStats(e.weights),meta=b.querySelector(".meta");
+      const bits=[[gearTxt(e),1],[e.trackCond,0],[e.airTemp!=null?e.airTemp+"°F":"",1],[s?"Cross "+pct(s.cross):"",1],
+        [e.bestLap!=null?lapTxt(e.bestLap)+"s":"",1],[(e.photoIds||[]).length?"📷 "+e.photoIds.length:"",0]].filter(x=>x[0]);
+      // each item keeps its leading "·" so a wrapped line never starts with a dangling separator
+      bits.forEach(([t,isNum],i)=>{if(i)meta.appendChild(document.createTextNode(" "));const sp=document.createElement("span");sp.textContent=(i?"· ":"")+t;sp.style.whiteSpace="nowrap";if(isNum)sp.className="num";meta.appendChild(sp)});
+      meta.hidden=!bits.length;
       const tg=b.querySelector(".tags");(e.handling||[]).forEach(t=>{const s=document.createElement("span");s.className="tag";s.textContent=t;tg.appendChild(s)});tg.hidden=!(e.handling||[]).length;
       const fin=b.querySelector(".fin");fin.textContent=e.finish!=null?"P"+e.finish:"–";if(isWin(e))fin.classList.add("win");
       b.setAttribute("aria-label",rnum(e)+", "+fmtDate(e.date)+", "+b.querySelector(".tn").textContent+(e.finish!=null?", finished P"+e.finish:"")+". Edit");

@@ -1,5 +1,6 @@
 <!--
   VERSION HISTORY (newest first)
+  v1.1.0  2026-10-22  Added v1.1.0.
   v1.0.0  2026-10-21  First entry.
 -->
 # RaceNotes — Changelog
@@ -7,6 +8,15 @@
 Every past build is kept in `versions/`. To roll back, copy an older file over `index.html`,
 upload, and bump `CACHE` in `sw.js` so phones pick it up. Entries stored on your devices are not
 affected.
+
+## v1.1.0 — 2026-10-22 — Gears and conditions in the list
+- Each row in the entry list now shows the gears as driver-driven teeth (e.g. `11-64`) instead of
+  the calculated ratio, so you can see at a glance what you ran. The ratio still shows on the
+  entry form, the PDF and the CSV.
+- Rows also show the track condition (Heavy / Tacky / Dry-slick / Wet) and air temp, alongside
+  cross %, best lap and photo count. That line now wraps instead of being cut off on phones.
+- Search also matches gears, e.g. type `16-55`.
+- Files: `versions/racenotes-v1.1.0.html`
 
 ## v1.0.0 — 2026-10-21 — First build
 - Installable offline web app (PWA) built on the Receipt Log pattern: one `index.html`, `sw.js`,
