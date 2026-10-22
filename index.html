@@ -12,6 +12,9 @@
   copying an older file over index.html. Your entries live in the
   browser's on-device storage and are NOT touched by swapping versions.
 
+  v1.2.0  2026-10-22  Dirt-track photo background (brand/track-bg.jpg),
+                      washed toward the page colour and pinned behind the
+                      cards; labels on the photo get a soft halo.
   v1.1.0  2026-10-22  Entry list shows gears as teeth (e.g. 11-64) instead
                       of the ratio, plus track condition and air temp.
                       Search also matches gears.
@@ -48,14 +51,22 @@
   --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
   --font-display:"Chakra Petch","Archivo",system-ui,sans-serif;
   --r:10px; color-scheme:light;
+  --wash:rgba(238,241,242,.62);
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#101716; --surface:#18211f; --ink:#e6eeec; --muted:#93a3a0; --line:#2b3835;
-  --accent:#4cbf9f; --accent-ink:#06231b; --accent-soft:#1d3a32; --danger:#f0806f; --danger-soft:#3b211d; color-scheme:dark}}
+  --accent:#4cbf9f; --accent-ink:#06231b; --accent-soft:#1d3a32; --danger:#f0806f; --danger-soft:#3b211d; color-scheme:dark;
+  --wash:rgba(16,23,22,.74)}}
 *{box-sizing:border-box}
 html,body{margin:0}
 img{max-width:100%}
 [hidden]{display:none!important}
+/* dirt-track photo behind the cards, washed toward the page colour so text on it stays readable;
+   pinned to the screen so it stays put while scrolling */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(var(--wash),var(--wash)),url("brand/track-bg.jpg") 62% 70%/cover no-repeat}
+/* text that sits straight on the photo gets a soft halo in the page colour */
+header .sub,#seasonLabel,.month-head .label,footer>div{text-shadow:0 0 2px var(--bg),0 0 6px var(--bg),0 0 10px var(--bg)}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
@@ -302,7 +313,7 @@ footer .brand img{display:block;height:20px;width:auto}
       <source srcset="brand/logo-horizontal-white.svg" media="(prefers-color-scheme: dark)">
       <img src="brand/logo-horizontal.svg" alt="Austin Bergquist" width="202" height="20">
     </picture>
-    <div>RaceNotes <span id="ver">v1.1.0</span></div>
+    <div>RaceNotes <span id="ver">v1.2.0</span></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -318,7 +329,7 @@ window.addEventListener("error",function(e){var s=document.getElementById("statu
 <script>
 (function(){
 "use strict";
-const APP_VERSION="1.1.0";
+const APP_VERSION="1.2.0";
 const SESSIONS=["Practice","Heat","Feature","Test"];
 const HANDLING=["Tight entry","Tight center","Tight exit","Loose entry","Loose center","Loose exit","Good"];
 const CONDS=["Heavy","Tacky","Dry-slick","Wet"];

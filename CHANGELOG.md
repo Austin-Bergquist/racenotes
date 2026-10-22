@@ -1,5 +1,6 @@
 <!--
   VERSION HISTORY (newest first)
+  v1.2.0  2026-10-22  Added v1.2.0.
   v1.1.0  2026-10-22  Added v1.1.0.
   v1.0.0  2026-10-21  First entry.
 -->
@@ -8,6 +9,15 @@
 Every past build is kept in `versions/`. To roll back, copy an older file over `index.html`,
 upload, and bump `CACHE` in `sw.js` so phones pick it up. Entries stored on your devices are not
 affected.
+
+## v1.2.0 — 2026-10-22 — Dirt-track photo background
+- The page background is now a photo of a red-clay dirt oval (`brand/track-bg.jpg`, 1408×768,
+  ~200 KB), washed toward the page colour in light and dark mode and pinned behind the cards so it
+  stays put while you scroll. Cards keep their solid fill, so the form and list read as before.
+- Labels that sit straight on the photo (status line, season label, month headers, footer version)
+  get a soft halo in the page colour so they stay readable.
+- The photo is in the offline cache, so it shows at the track with no signal.
+- Files: `versions/racenotes-v1.2.0.html`
 
 ## v1.1.0 — 2026-10-22 — Gears and conditions in the list
 - Each row in the entry list now shows the gears as driver-driven teeth (e.g. `11-64`) instead of

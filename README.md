@@ -1,5 +1,6 @@
 <!--
   VERSION HISTORY (newest first)
+  v1.2.0  2026-10-22  Current version line; background photo in the file list.
   v1.1.0  2026-10-22  Current version line updated.
   v1.0.0  2026-10-21  First README.
 -->
@@ -7,7 +8,7 @@
 
 Log your go-kart race nights: one entry per session with results, handling, track conditions and
 your full setup (gearing, tire pressures, corner weights). Installs on your phone and PC and works
-offline. Current version: **v1.1.0** (see `CHANGELOG.md`).
+offline. Current version: **v1.2.0** (see `CHANGELOG.md`).
 
 ## Put it online with GitHub Pages (one time, ~5 minutes)
 
@@ -71,7 +72,7 @@ entry and a line to the VERSION HISTORY block at the top of each changed file, a
 | `index.html` | The app |
 | `sw.js` | Offline support |
 | `manifest.webmanifest`, `icons/` | Install name and icons (rendered from `brand/app-icon.svg`) |
-| `brand/` | Logos and the app icon source |
+| `brand/` | Logos, the app icon source and the background photo (`track-bg.jpg`) |
 | `vendor/jspdf/` | PDF builder (jsPDF 2.5.1, MIT) |
 | `vendor/jszip/` | ZIP builder (JSZip 3.10.1, MIT) |
 | `versions/` | Every past build, for rollback |
