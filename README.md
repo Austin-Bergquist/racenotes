@@ -1,5 +1,6 @@
 <!--
   VERSION HISTORY (newest first)
+  v1.3.0  2026-10-22  Current version line; tire sets under Using it.
   v1.2.0  2026-10-22  Current version line; background photo in the file list.
   v1.1.0  2026-10-22  Current version line updated.
   v1.0.0  2026-10-21  First README.
@@ -8,7 +9,7 @@
 
 Log your go-kart race nights: one entry per session with results, handling, track conditions and
 your full setup (gearing, tire pressures, corner weights). Installs on your phone and PC and works
-offline. Current version: **v1.2.0** (see `CHANGELOG.md`).
+offline. Current version: **v1.3.0** (see `CHANGELOG.md`).
 
 ## Put it online with GitHub Pages (one time, ~5 minutes)
 
@@ -44,6 +45,10 @@ track with no signal.
   copied from. Setup changes and notes are left for you to write fresh.
 - **Ratio** = driven ÷ driver teeth. **Cross** = (RF + LR) ÷ total weight. Left % and rear % are
   shown too.
+- **Tire sets** (panel below the list): name each set, then log every prep as you do it — date and
+  what was done, like "Wiped Prep X on rights, 2 coats". Pick the set in an entry's Setup section to
+  tie the session to it; the PDF setup sheet then shows what had been done to that set by race day.
+  Retire a set when it's done so it drops out of the picker but keeps its history.
 - Tap a row to edit it. Delete asks before removing anything.
 
 ## Your data

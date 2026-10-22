@@ -12,6 +12,13 @@
   copying an older file over index.html. Your entries live in the
   browser's on-device storage and are NOT touched by swapping versions.
 
+  v1.3.0  2026-10-22  Tire sets: name each set, keep a dated prep log
+                      (what was wiped on, soaks, scuffing), retire or
+                      delete sets. Entries pick the set they ran on; the
+                      set shows in the list, search, Copy last setup, the
+                      PDF setup sheet (with prep up to that session), CSV
+                      and backups (restore merges prep logs).
+                      Database version 2 adds a "tires" store.
   v1.2.0  2026-10-22  Dirt-track photo background (brand/track-bg.jpg),
                       washed toward the page colour and pinned behind the
                       cards; labels on the photo get a soft halo.
@@ -154,6 +161,26 @@ details.data summary{cursor:pointer;font-weight:600;min-height:24px}
 details.data .inner{display:flex;flex-direction:column;gap:10px;margin-top:12px}
 .ex-sum{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .chips .chip.mini{min-height:32px;padding:5px 10px;font-size:12.5px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;min-height:36px;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+/* v1.3.0: tire sets */
+.tire-add{display:flex;gap:8px;flex-wrap:wrap}
+.tire-add input{flex:1 1 150px}
+.tset{background:var(--bg);border:1px solid var(--line);border-radius:8px}
+.tset.retired{opacity:.7}
+.tset-head{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;min-height:44px;background:transparent;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.tset-head .nm{font-weight:700}
+.tset-head .sm{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tset-head .runs{font-family:var(--font-num);font-size:12px;color:var(--muted);white-space:nowrap}
+.tset-body{border-top:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:12px}
+.prep-add{display:grid;grid-template-columns:150px 1fr;gap:8px}
+@media (max-width:440px){.prep-add{grid-template-columns:1fr}}
+.tlog{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tlog-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:6px 6px 6px 10px;border-top:1px solid var(--line)}
+.tlog-row:first-child{border-top:0}
+.tlog-row .d{font-family:var(--font-num);font-size:12px;color:var(--muted);white-space:nowrap}
+.tlog-row .t{overflow-wrap:anywhere}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;background:var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
 footer{color:var(--muted);font-size:12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
 footer .brand img{display:block;height:20px;width:auto}
 .viewer{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:30;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}
@@ -233,7 +260,10 @@ footer .brand img{display:block;height:20px;width:auto}
         <div><span>Rear</span><b id="wRear">–</b></div>
         <div><span>Cross</span><b id="wCross">–</b></div>
       </div>
-      <div class="field"><label class="label" for="tires">Tires / compound</label><input id="tires" type="text" placeholder="e.g. Burris 33 / 60"></div>
+      <div class="grid2">
+        <div class="field"><label class="label" for="tireSet">Tire set</label><select id="tireSet"><option value="">No set picked</option></select></div>
+        <div class="field"><label class="label" for="tires">Tires / compound</label><input id="tires" type="text" placeholder="e.g. Burris 33 / 60"></div>
+      </div>
       <div class="field"><label class="label" for="changes">Setup changes</label><textarea id="changes" placeholder="What you changed and why"></textarea></div>
     </div>
 
@@ -267,6 +297,22 @@ footer .brand img{display:block;height:20px;width:auto}
     </div>
     <div id="list"></div>
   </section>
+
+  <details class="data" id="tirePanel">
+    <summary>Tire sets <span class="sub" id="tireCount"></span></summary>
+    <div class="inner">
+      <div class="sub">Name each set of tires and keep a log of what's been done to them: prep wiped on, soaking, scuffing, anything else. Pick the set on an entry to tie it to that session.</div>
+      <div class="tire-add">
+        <input id="newSetName" type="text" placeholder="Set name, e.g. Set A" aria-label="New tire set name" autocapitalize="words">
+        <input id="newSetComp" type="text" placeholder="Tires / compound (optional)" aria-label="New tire set tires or compound">
+        <button class="btn small" type="button" id="addSet">Add set</button>
+      </div>
+      <div class="err" id="tireErr" role="alert"></div>
+      <div id="tireList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <label class="check" id="retiredWrap" hidden><input type="checkbox" id="showRetired"> Show retired sets</label>
+      <datalist id="prepList"></datalist>
+    </div>
+  </details>
 
   <details class="data" id="exportPanel">
     <summary>Export</summary>
@@ -313,7 +359,7 @@ footer .brand img{display:block;height:20px;width:auto}
       <source srcset="brand/logo-horizontal-white.svg" media="(prefers-color-scheme: dark)">
       <img src="brand/logo-horizontal.svg" alt="Austin Bergquist" width="202" height="20">
     </picture>
-    <div>RaceNotes <span id="ver">v1.2.0</span></div>
+    <div>RaceNotes <span id="ver">v1.3.0</span></div>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -329,7 +375,7 @@ window.addEventListener("error",function(e){var s=document.getElementById("statu
 <script>
 (function(){
 "use strict";
-const APP_VERSION="1.2.0";
+const APP_VERSION="1.3.0";
 const SESSIONS=["Practice","Heat","Feature","Test"];
 const HANDLING=["Tight entry","Tight center","Tight exit","Loose entry","Loose center","Loose exit","Good"];
 const CONDS=["Heavy","Tacky","Dry-slick","Wet"];
@@ -341,8 +387,9 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 
 /* ---------- On-device storage (IndexedDB) ---------- */
 let idb=null, idbOpening=null;
-function openDB(){return new Promise((ok,bad)=>{const r=indexedDB.open("racenotes",1);
-  r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("entries",{keyPath:"id"});d.createObjectStore("files",{keyPath:"id"})};
+// v1.3.0: database version 2 adds the "tires" store; existing entries and photos carry over untouched
+function openDB(){return new Promise((ok,bad)=>{const r=indexedDB.open("racenotes",2);
+  r.onupgradeneeded=()=>{const d=r.result;["entries","files","tires"].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:"id"})})};
   r.onsuccess=()=>{const d=r.result;
     // iOS Safari can close the connection behind our back (e.g. after the camera opens): forget it so the next call reopens
     d.onclose=()=>{if(idb===d)idb=null};d.onversionchange=()=>{d.close();if(idb===d)idb=null};ok(d)};
@@ -369,6 +416,7 @@ async function putFile(id,blob){await put("files",{id,mime:blob.type||"image/jpe
 function fileBlob(f){return f.blob||new Blob([f.data],{type:f.mime||"image/jpeg"})}
 
 let entries=[], editingId=null;
+let tireSets=[];            // v1.3.0: [{id, name, compound, retired, log:[{id, date, text}], createdAt, updatedAt}]
 let photos=[];              // [{id, blob, isNew}]
 let removedPhotoIds=[];
 const pick={session:new Set(),handling:new Set(),cond:new Set()};
@@ -385,6 +433,11 @@ const lapTxt=x=>x==null?"":(+x).toFixed(3);
 const pos=x=>x==null?"–":"P"+x;
 const gearTxt=e=>e.gearDriver==null&&e.gearDriven==null?"":(e.gearDriver==null?"?":e.gearDriver)+"-"+(e.gearDriven==null?"?":e.gearDriven);
 function gearRatio(e){return e.gearDriver>0&&e.gearDriven>0?e.gearDriven/e.gearDriver:null}
+// An entry keeps the set's name from when it was saved, so it still reads right if the set is deleted later
+const setById=id=>tireSets.find(s=>s.id===id);
+const setName=e=>{if(!e.tireSetId)return "";const s=setById(e.tireSetId);return s?s.name:(e.tireSetName||"")};
+// prep notes on a set up to a date, newest first
+const prepUpTo=(s,date)=>(s&&s.log||[]).filter(l=>!date||l.date<=date).sort((a,b)=>b.date.localeCompare(a.date));
 function weightStats(w){
   if(!w||CORNERS.some(k=>!(w[k]>0)))return null;
   const t=w.lf+w.rf+w.lr+w.rr;
@@ -437,6 +490,7 @@ function resetForm(keep){
   TEXT_FIELDS.concat(Object.keys(NUM_FIELDS)).forEach(id=>setVal(id,""));
   CORNERS.forEach(k=>{setVal("p"+k,"");setVal("w"+k,"")});
   $("track").value=recall("track")||""; $("kclass").value=recall("class")||"";
+  const lastSet=setById(recall("tireSet")); fillTireSelect(lastSet&&!lastSet.retired?lastSet.id:"");
   if(!keep) $("date").value=today();
   pick.session.clear();pick.handling.clear();pick.cond.clear();drawChips();
   photos=[]; removedPhotoIds=[]; showPhotos(); $("formErr").textContent=""; copyMsg("");
@@ -450,7 +504,7 @@ async function startEdit(e){
   setVal("start",e.start); setVal("finish",e.finish); setVal("cars",e.cars); setVal("bestLap",e.bestLap==null?"":lapTxt(e.bestLap));
   setVal("airTemp",e.airTemp); setVal("gDriver",e.gearDriver); setVal("gDriven",e.gearDriven);
   CORNERS.forEach(k=>{setVal("p"+k,e.press&&e.press[k]);setVal("w"+k,e.weights&&e.weights[k])});
-  setVal("tires",e.tires); setVal("changes",e.setupChanges); setVal("notes",e.notes);
+  setVal("tires",e.tires); setVal("changes",e.setupChanges); setVal("notes",e.notes); fillTireSelect(e.tireSetId||"");
   pick.session=new Set(e.session?[e.session]:[]); pick.handling=new Set(e.handling||[]); pick.cond=new Set(e.trackCond?[e.trackCond]:[]); drawChips();
   photos=[]; removedPhotoIds=[];
   for(const id of e.photoIds||[]){const f=await getOne("files",id).catch(()=>null);if(f)photos.push({id,blob:fileBlob(f),isNew:false})}
@@ -488,6 +542,7 @@ $("slip").addEventListener("submit",async ev=>{
     start:n.start,finish:n.finish,cars:n.cars,bestLap:n.bestLap,
     handling:HANDLING.filter(h=>pick.handling.has(h)),trackCond:[...pick.cond][0]||"",airTemp:n.airTemp,
     gearDriver:n.gDriver,gearDriven:n.gDriven,press,weights,
+    tireSetId:$("tireSet").value||null,tireSetName:$("tireSet").value?(setById($("tireSet").value)||{}).name||"":"",
     tires:$("tires").value.trim(),setupChanges:$("changes").value.trim(),notes:$("notes").value.trim(),
     photoIds:photos.map(p=>p.id),createdAt:old?old.createdAt:now,updatedAt:now};
   $("saveBtn").disabled=true;
@@ -495,7 +550,7 @@ $("slip").addEventListener("submit",async ev=>{
     for(const p of photos)if(p.isNew)await putFile(p.id,p.blob);
     await put("entries",e);
     for(const id of removedPhotoIds)if(!e.photoIds.includes(id))await del("files",id);
-    if(e.track)remember("track",e.track); if(e.kartClass)remember("class",e.kartClass);
+    if(e.track)remember("track",e.track); if(e.kartClass)remember("class",e.kartClass); remember("tireSet",e.tireSetId||"");
     toast(editingId?"Changes saved":"Saved "+rnum(e)+(e.track?" · "+e.track:""));
     resetForm(!editingId); await load();
   }catch(x){
@@ -504,7 +559,7 @@ $("slip").addEventListener("submit",async ev=>{
 });
 
 /* ---------- Copy last setup ---------- */
-const hasSetup=e=>e.gearDriver!=null||e.gearDriven!=null||e.tires||CORNERS.some(k=>(e.press&&e.press[k]!=null)||(e.weights&&e.weights[k]!=null));
+const hasSetup=e=>e.gearDriver!=null||e.gearDriven!=null||e.tires||e.tireSetId||CORNERS.some(k=>(e.press&&e.press[k]!=null)||(e.weights&&e.weights[k]!=null));
 function copyMsg(t,ok){const m=$("copyMsg");m.hidden=!t;m.textContent=t||"";m.className="note"+(ok?" ok":"")}
 $("copySetup").onclick=()=>{
   const t=$("track").value.trim(),tl=t.toLowerCase();
@@ -515,8 +570,128 @@ $("copySetup").onclick=()=>{
   setVal("gDriver",src.gearDriver);setVal("gDriven",src.gearDriven);
   CORNERS.forEach(k=>{setVal("p"+k,src.press&&src.press[k]);setVal("w"+k,src.weights&&src.weights[k])});
   setVal("tires",src.tires);calc();
-  copyMsg("Copied gearing, pressures, weights and tires from "+rnum(src)+" · "+fmtDate(src.date)+(src.track?" · "+src.track:"")+(src.session?" ("+src.session+")":"")+(t?"":" — most recent at any track")+".",true);
+  // v1.3.0: the tire set comes along too, unless it has since been retired or deleted
+  const ss=setById(src.tireSetId),setOk=ss&&!ss.retired;
+  if(setOk)fillTireSelect(ss.id);
+  copyMsg("Copied gearing, pressures, weights"+(setOk?", tires and tire set ("+ss.name+")":" and tires")+" from "+rnum(src)+" · "+fmtDate(src.date)+(src.track?" · "+src.track:"")+(src.session?" ("+src.session+")":"")+(t?"":" — most recent at any track")+"."+
+    (ss&&ss.retired?" "+ss.name+" is retired, so no set was picked.":""),true);
 };
+
+/* ---------- Tire sets (v1.3.0): named sets with a dated prep log ---------- */
+let openSetId=null;
+const bySetName=(a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:"base"});
+const runsOn=s=>entries.filter(e=>e.tireSetId===s.id);
+function fillTireSelect(selected){
+  const sel=$("tireSet");sel.length=1;
+  const list=tireSets.filter(s=>!s.retired||s.id===selected).sort(bySetName);
+  list.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.name+(s.compound?" · "+s.compound:"")+(s.retired?" (retired)":"");sel.appendChild(o)});
+  sel.value=list.some(s=>s.id===selected)?selected:"";
+}
+$("tireSet").addEventListener("change",()=>{
+  // picking a set fills the tires box when it's empty
+  const s=setById($("tireSet").value);if(s&&s.compound&&!$("tires").value.trim())$("tires").value=s.compound;
+});
+async function saveSet(s){s.updatedAt=new Date().toISOString();await put("tires",s);
+  const i=tireSets.findIndex(x=>x.id===s.id);if(i<0)tireSets.push(s);else tireSets[i]=s}
+const nameTaken=(name,exceptId)=>tireSets.some(s=>s.id!==exceptId&&s.name.trim().toLowerCase()===name.trim().toLowerCase());
+const tireErr=m=>{$("tireErr").textContent=m||""};
+$("addSet").onclick=async()=>{
+  const name=$("newSetName").value.trim();
+  if(!name){$("newSetName").focus();return tireErr("Give the set a name, like Set A or Rears #2.")}
+  if(nameTaken(name))return tireErr("You already have a set called "+name+".");
+  const now=new Date().toISOString();
+  const s={id:uid(),name,compound:$("newSetComp").value.trim(),retired:false,log:[],createdAt:now,updatedAt:now};
+  try{await saveSet(s)}catch(e){return tireErr("Couldn't save: "+e)}
+  $("newSetName").value="";$("newSetComp").value="";tireErr("");openSetId=s.id;
+  renderTires();fillTireSelect($("tireSet").value);toast("Added "+name);
+};
+$("newSetName").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("addSet").click()}});
+$("showRetired").addEventListener("change",renderTires);
+function el(tag,cls,text){const x=document.createElement(tag);if(cls)x.className=cls;if(text!=null)x.textContent=text;return x}
+function renderTires(){
+  const box=$("tireList");box.innerHTML="";
+  const active=tireSets.filter(s=>!s.retired).length,retired=tireSets.length-active;
+  $("tireCount").textContent=tireSets.length?"· "+active+" active":"";
+  $("retiredWrap").hidden=!retired;
+  // past prep notes become suggestions, so a product you use every week is one tap away
+  const seen=new Set();$("prepList").innerHTML="";
+  tireSets.flatMap(s=>s.log||[]).sort((a,b)=>b.date.localeCompare(a.date)).forEach(l=>{const k=l.text.toLowerCase();if(seen.has(k)||seen.size>=30)return;seen.add(k);
+    const o=document.createElement("option");o.value=l.text;$("prepList").appendChild(o)});
+  const shown=tireSets.filter(s=>!s.retired||$("showRetired").checked).sort((a,b)=>(a.retired-b.retired)||bySetName(a,b));
+  if(!tireSets.length){box.appendChild(el("div","empty","No tire sets yet. Add one above, then log each prep as you do it."));return}
+  shown.forEach(s=>{
+    const runs=runsOn(s),last=prepUpTo(s)[0],isOpen=openSetId===s.id;
+    const card=el("div","tset"+(s.retired?" retired":""));
+    const head=el("button","tset-head");head.type="button";head.setAttribute("aria-expanded",String(isOpen));
+    const left=el("div");left.style.minWidth="0";
+    const nm=el("div","nm",s.name);if(s.retired)nm.appendChild(el("span","badge","retired"));
+    left.append(nm,el("div","sm",[s.compound,last?"Last prep "+fmtShort(last.date)+": "+last.text:"No prep logged"].filter(Boolean).join(" · ")));
+    head.append(left,el("span","runs",runs.length+" session"+(runs.length===1?"":"s")));
+    head.onclick=()=>{openSetId=isOpen?null:s.id;tireErr("");renderTires()};
+    card.appendChild(head);
+    if(isOpen)card.appendChild(setBody(s,runs));
+    box.appendChild(card);
+  });
+}
+const fmtShort=d=>new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+function setBody(s,runs){
+  const body=el("div","tset-body");
+  // name + compound, saved when you leave the box
+  const g=el("div","grid2");
+  const fld=(label,val,ph,onSave)=>{const f=el("div","field"),l=el("label","label",label),i=el("input");i.type="text";i.value=val||"";i.placeholder=ph;
+    i.id="ts_"+label.replace(/\W/g,"")+"_"+s.id;l.htmlFor=i.id;i.addEventListener("change",()=>onSave(i));f.append(l,i);return f};
+  g.append(fld("Set name",s.name,"Set name",async i=>{const v=i.value.trim();
+      if(!v){i.value=s.name;return tireErr("A set needs a name.")}
+      if(nameTaken(v,s.id)){i.value=s.name;return tireErr("You already have a set called "+v+".")}
+      s.name=v;await saveSet(s);tireErr("");renderTires();fillTireSelect($("tireSet").value);render()}),
+    fld("Tires / compound",s.compound,"e.g. Burris 33",async i=>{s.compound=i.value.trim();await saveSet(s);renderTires();fillTireSelect($("tireSet").value)}));
+  body.appendChild(g);
+  // add a prep note
+  const pf=el("div","field");pf.appendChild(el("span","label","Add prep note"));
+  const pa=el("div","prep-add");
+  const d=el("input");d.type="date";d.value=today();d.setAttribute("aria-label","Prep date");
+  const t=el("input");t.type="text";t.placeholder="e.g. Wiped Prep X on rights, 2 coats";t.setAttribute("list","prepList");t.setAttribute("aria-label","What was done");
+  pa.append(d,t);
+  const addBtn=el("button","btn small","Add note");addBtn.type="button";
+  addBtn.onclick=async()=>{const txt=t.value.trim();
+    if(!txt){t.focus();return tireErr("Write what was done, like the prep and how many coats.")}
+    if(!d.value)return tireErr("Pick the date of the prep.");
+    s.log=(s.log||[]).concat({id:uid(),date:d.value,text:txt});
+    try{await saveSet(s)}catch(e){return tireErr("Couldn't save: "+e)}
+    tireErr("");renderTires();toast("Prep note added to "+s.name)};
+  t.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addBtn.click()}});
+  pf.append(pa);body.append(pf,addBtn);addBtn.style.alignSelf="flex-start";
+  // the log, newest first; delete needs a second tap
+  const log=prepUpTo(s);
+  const lw=el("div","field");lw.appendChild(el("span","label","Prep log"+(log.length?" · "+log.length:"")));
+  if(!log.length)lw.appendChild(el("div","sub","Nothing logged yet."));
+  else{const box=el("div","tlog");
+    log.forEach(l=>{const row=el("div","tlog-row");row.append(el("span","d",fmtShort(l.date)+" "+l.date.slice(0,4)),el("span","t",l.text));
+      const x=el("button","btn small ghost","Delete");x.type="button";x.setAttribute("aria-label","Delete prep note from "+fmtDate(l.date));
+      x.onclick=async()=>{if(x.dataset.arm!=="1"){x.dataset.arm="1";x.textContent="Delete?";x.classList.add("danger");return}
+        s.log=s.log.filter(y=>y.id!==l.id);await saveSet(s);renderTires();toast("Prep note deleted")};
+      row.appendChild(x);box.appendChild(row)});
+    lw.appendChild(box)}
+  body.appendChild(lw);
+  // sessions run on this set
+  if(runs.length){const r=el("div","sub");r.textContent="Run in "+runs.slice(0,6).map(e=>rnum(e)+" ("+fmtShort(e.date)+(e.track?", "+e.track:"")+")").join(", ")+(runs.length>6?" and "+(runs.length-6)+" more":"")+".";body.appendChild(r)}
+  // retire / delete
+  const acts=el("div","actions");
+  const ret=el("button","btn small",s.retired?"Bring back":"Retire set");ret.type="button";
+  ret.onclick=async()=>{s.retired=!s.retired;await saveSet(s);if(s.retired&&!$("showRetired").checked)openSetId=null;renderTires();fillTireSelect($("tireSet").value);toast(s.name+(s.retired?" retired":" is back"))};
+  const delb=el("button","btn small danger","Delete set");delb.type="button";
+  const conf=el("div","confirm");conf.hidden=true;
+  conf.append(el("span",null,"Delete "+s.name+" and its prep log for good?"+(runs.length?(runs.length===1?" The 1 entry that used it keeps":" The "+runs.length+" entries that used it keep")+" its name.":"")));
+  const yes=el("button","btn small danger","Delete");yes.type="button";const no=el("button","btn small","Keep it");no.type="button";
+  yes.onclick=async()=>{try{
+      // entries that ran on it keep its current name (it may have been renamed since they were saved)
+      for(const e of runs)if(e.tireSetName!==s.name){e.tireSetName=s.name;await put("entries",e)}
+      await del("tires",s.id)}catch(e){return tireErr("Couldn't delete: "+e)}
+    tireSets=tireSets.filter(x=>x.id!==s.id);openSetId=null;renderTires();fillTireSelect($("tireSet").value);render();toast(s.name+" deleted")};
+  no.onclick=()=>{conf.hidden=true};delb.onclick=()=>{conf.hidden=false};
+  conf.append(yes,no);acts.append(ret,delb);body.append(acts,conf);
+  return body;
+}
 
 /* ---------- Photos ---------- */
 function shrink(file,max){return new Promise(res=>{
@@ -567,7 +742,10 @@ async function load(){
   const missing=entries.filter(e=>!e.num).sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt).localeCompare(String(b.createdAt)));
   if(missing.length){let n=entries.reduce((m,e)=>Math.max(m,e.num||0),0);for(const e of missing){e.num=++n;await put("entries",e)}}
   entries.sort(byNewest);
-  render(); drawExFilters(); exUpdate();
+  tireSets=await getAll("tires");
+  // a new entry starts on the set you used last, as long as it's still in use
+  if(!editingId&&!$("tireSet").value){const l=setById(recall("tireSet"));fillTireSelect(l&&!l.retired?l.id:"")}else fillTireSelect($("tireSet").value);
+  render(); renderTires(); drawExFilters(); exUpdate();
 }
 const tracks=()=>[...new Set(entries.map(e=>e.track).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
 const isWin=e=>e.session==="Feature"&&e.finish===1;
@@ -584,7 +762,7 @@ function render(){
   fillList("classList",[...new Set(entries.map(e=>e.kartClass).filter(Boolean))].sort());
   const ft=$("filterTrack"),cur=ft.value;ft.length=1;ts.forEach(t=>{const o=document.createElement("option");o.value=t;o.textContent=t;ft.appendChild(o)});ft.value=ts.includes(cur)?cur:"";
   const q=$("search").value.trim().toLowerCase(),fv=ft.value;
-  const shown=entries.filter(e=>(!fv||e.track===fv)&&(!q||[rnum(e),e.track,e.kartClass,e.session,e.trackCond,gearTxt(e),e.tires,e.setupChanges,e.notes,(e.handling||[]).join(" ")].join(" ").toLowerCase().includes(q)));
+  const shown=entries.filter(e=>(!fv||e.track===fv)&&(!q||[rnum(e),e.track,e.kartClass,e.session,e.trackCond,gearTxt(e),setName(e),e.tires,e.setupChanges,e.notes,(e.handling||[]).join(" ")].join(" ").toLowerCase().includes(q)));
   const list=$("list");list.innerHTML="";
   if(!entries.length){list.innerHTML='<div class="empty">Your sessions will show up here, newest first, grouped by month. Fill in the form above and tap <b>Save entry</b>.</div>';return}
   if(!shown.length){list.innerHTML='<div class="empty">No entries match that search.</div>';return}
@@ -606,7 +784,7 @@ function render(){
       b.querySelector(".tn").textContent=[e.track||"(no track)",e.session,e.kartClass].filter(Boolean).join(" · ");
       // v1.1.0: gears as teeth (11-64) instead of the ratio, plus track condition and air temp
       const s=weightStats(e.weights),meta=b.querySelector(".meta");
-      const bits=[[gearTxt(e),1],[e.trackCond,0],[e.airTemp!=null?e.airTemp+"°F":"",1],[s?"Cross "+pct(s.cross):"",1],
+      const bits=[[gearTxt(e),1],[setName(e),0],[e.trackCond,0],[e.airTemp!=null?e.airTemp+"°F":"",1],[s?"Cross "+pct(s.cross):"",1],
         [e.bestLap!=null?lapTxt(e.bestLap)+"s":"",1],[(e.photoIds||[]).length?"📷 "+e.photoIds.length:"",0]].filter(x=>x[0]);
       // each item keeps its leading "·" so a wrapped line never starts with a dangling separator
       bits.forEach(([t,isNum],i)=>{if(i)meta.appendChild(document.createTextNode(" "));const sp=document.createElement("span");sp.textContent=(i?"· ":"")+t;sp.style.whiteSpace="nowrap";if(isNum)sp.className="num";meta.appendChild(sp)});
@@ -687,12 +865,12 @@ function buildCsv(sel){
   const esc=v=>{v=v==null?"":String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const rows=[["Entry #","Date","Track","Class","Session","Start","Finish","Cars","Best lap (s)","Handling","Track condition","Air temp (F)",
     "Driver teeth","Driven teeth","Ratio","LF psi","RF psi","LR psi","RR psi","LF lbs","RF lbs","LR lbs","RR lbs","Total lbs","Left %","Rear %","Cross %",
-    "Tires","Setup changes","Notes","Photo files"]]
+    "Tire set","Tires","Tire prep (up to this session)","Setup changes","Notes","Photo files"]]
     .concat(sel.map(e=>{const r=gearRatio(e),s=weightStats(e.weights),p=e.press||{},w=e.weights||{};
       return [rnum(e),e.date,e.track,e.kartClass,e.session,e.start,e.finish,e.cars,e.bestLap==null?"":lapTxt(e.bestLap),(e.handling||[]).join("; "),e.trackCond,e.airTemp,
         e.gearDriver,e.gearDriven,r?r.toFixed(2):"",p.lf,p.rf,p.lr,p.rr,w.lf,w.rf,w.lr,w.rr,
         s?s.total.toFixed(1):"",s?(s.left*100).toFixed(1):"",s?(s.rear*100).toFixed(1):"",s?(s.cross*100).toFixed(1):"",
-        e.tires,e.setupChanges,e.notes,photoNames(e).join("; ")]}));
+        setName(e),e.tires,prepUpTo(setById(e.tireSetId),e.date).map(l=>l.date+" "+l.text).join("; "),e.setupChanges,e.notes,photoNames(e).join("; ")]}));
   return "﻿"+rows.map(r=>r.map(esc).join(",")).join("\r\n");   // BOM so Excel reads it as UTF-8
 }
 async function saveOut(name,blob){
@@ -848,7 +1026,7 @@ $("exPdf").onclick=async()=>{
         doc.setFont("helvetica","normal");doc.setFontSize(10);col(INK);doc.text(fit(v||"–",w),x,y+14)};
       kv("Track condition",e.trackCond,M,150);kv("Handling",(e.handling||[]).join(", "),M+170,W-2*M-170);y+=34;
       kv("Gearing",e.gearDriver!=null||e.gearDriven!=null?(e.gearDriver==null?"?":e.gearDriver)+" / "+(e.gearDriven==null?"?":e.gearDriven)+" teeth":"",M,150);
-      kv("Ratio",r?r.toFixed(2):"",M+170,100);kv("Tires / compound",e.tires,M+290,W-2*M-290);y+=40;
+      kv("Ratio",r?r.toFixed(2):"",M+170,100);kv("Tire set / compound",[setName(e),e.tires].filter(Boolean).join(" · "),M+290,W-2*M-290);y+=40;
       // corner grids
       const bottom=kartBox(M,y,"Tire pressures",e.press||{},"psi");
       kartBox(M+270,y,"Corner weights",e.weights||{},"lbs");
@@ -858,6 +1036,9 @@ $("exPdf").onclick=async()=>{
         doc.setFont("courier","bold");doc.setFontSize(9.5);col(INK);
         doc.text("Total "+s.total.toFixed(1)+" lbs  ·  Left "+pct(s.left)+"  ·  Rear "+pct(s.rear)+"  ·  Cross "+pct(s.cross),M+62,y+1)}
       y+=30;
+      // v1.3.0: what had been done to this tire set by the day of the session (newest first, last 6)
+      const prep=prepUpTo(setById(e.tireSetId),e.date);
+      if(prep.length)para("Tire prep on "+setName(e)+(prep.length>6?" (latest 6 of "+prep.length+")":""),prep.slice(0,6).map(l=>fmtDate(l.date)+" — "+l.text).join("\n"));
       para("Setup changes",e.setupChanges);
       para("Notes",e.notes);
       // photos, two across; continue on new pages as needed
@@ -888,11 +1069,11 @@ $("backupBtn").onclick=async()=>{
   $("dataMsg").textContent="Building backup…";
   try{
     const files=await getAll("files");
-    const out={app:"racenotes",version:APP_VERSION,exportedAt:new Date().toISOString(),entries,
+    const out={app:"racenotes",version:APP_VERSION,exportedAt:new Date().toISOString(),entries,tireSets,
       files:await Promise.all(files.map(async f=>({id:f.id,data:await b2d(fileBlob(f))})))};
     saveFile("racenotes-backup-"+today()+".json",new Blob([JSON.stringify(out)],{type:"application/json"}));
     remember("lastBackup",today());
-    $("dataMsg").textContent="Backup downloaded ("+entries.length+" entr"+(entries.length===1?"y":"ies")+", "+files.length+" photo"+(files.length===1?"":"s")+").";
+    $("dataMsg").textContent="Backup downloaded ("+entries.length+" entr"+(entries.length===1?"y":"ies")+", "+files.length+" photo"+(files.length===1?"":"s")+", "+tireSets.length+" tire set"+(tireSets.length===1?"":"s")+").";
   }catch(e){$("dataMsg").textContent="Couldn't build the backup: "+(e.message||e)}
 };
 $("restoreFile").addEventListener("change",async()=>{
@@ -900,13 +1081,22 @@ $("restoreFile").addEventListener("change",async()=>{
   try{
     const data=JSON.parse(await f.text());
     if(data.app!=="racenotes"||!Array.isArray(data.entries))throw new Error("not a RaceNotes backup");
-    let added=0,updated=0;
+    let added=0,updated=0,setsIn=0;
     for(const fl of data.files||[]){const blob=await (await fetch(fl.data)).blob();await putFile(fl.id,blob)}
+    // v1.3.0: tire sets merge too. The same set from two devices keeps every prep note from both;
+    // name/compound/retired come from whichever copy was edited last. Backups from before v1.3.0 have none.
+    for(const s of data.tireSets||[]){const ex=setById(s.id);
+      if(!ex){if(nameTaken(s.name))s.name+=" (restored)";await put("tires",s);tireSets.push(s);setsIn++;continue}
+      const ids=new Set((ex.log||[]).map(l=>l.id)),extra=(s.log||[]).filter(l=>!ids.has(l.id));
+      const newer=String(s.updatedAt)>String(ex.updatedAt);
+      if(!extra.length&&!newer)continue;
+      const m=Object.assign({},newer?s:ex,{log:(ex.log||[]).concat(extra),updatedAt:newer?s.updatedAt:ex.updatedAt});
+      await put("tires",m);tireSets[tireSets.indexOf(ex)]=m;setsIn++}
     for(const e of data.entries){const ex=entries.find(x=>x.id===e.id);
       if(!ex){if(e.num&&entries.some(x=>x.num===e.num))e.num=nextNum();entries.push(e);await put("entries",e);added++}
       else if(String(e.updatedAt)>String(ex.updatedAt)){e.num=ex.num;await put("entries",e);updated++}}
     await load();
-    $("dataMsg").textContent="Restored: "+added+" new, "+updated+" updated. Entries already here were kept.";
+    $("dataMsg").textContent="Restored: "+added+" new, "+updated+" updated"+(setsIn?", "+setsIn+" tire set"+(setsIn===1?"":"s")+" added or merged":"")+". Entries already here were kept.";
   }catch(e){$("dataMsg").textContent="That file couldn't be restored: "+e.message+"."}
 });
 

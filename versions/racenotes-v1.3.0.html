@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RaceNotes</title>
+<!--
+  RACENOTES — go-kart race-night log, standalone installable app
+  =================================================================
+  VERSION HISTORY (newest first). Full notes in CHANGELOG.md; every
+  past build is kept in the versions/ folder so you can roll back by
+  copying an older file over index.html. Your entries live in the
+  browser's on-device storage and are NOT touched by swapping versions.
+
+  v1.3.0  2026-10-22  Tire sets: name each set, keep a dated prep log
+                      (what was wiped on, soaks, scuffing), retire or
+                      delete sets. Entries pick the set they ran on; the
+                      set shows in the list, search, Copy last setup, the
+                      PDF setup sheet (with prep up to that session), CSV
+                      and backups (restore merges prep logs).
+                      Database version 2 adds a "tires" store.
+  v1.2.0  2026-10-22  Dirt-track photo background (brand/track-bg.jpg),
+                      washed toward the page colour and pinned behind the
+                      cards; labels on the photo get a soft halo.
+  v1.1.0  2026-10-22  Entry list shows gears as teeth (e.g. 11-64) instead
+                      of the ratio, plus track condition and air temp.
+                      Search also matches gears.
+  v1.0.0  2026-10-21  First build, on the Receipt Log app pattern:
+                      - One entry per session (RN-0001…): date, track,
+                        class, session, results, handling, conditions,
+                        gearing + ratio, 2x2 tire pressures and corner
+                        weights (total / left / rear / cross), tires,
+                        setup changes, notes, several photos
+                      - "Copy last setup" from the same track
+                      - Season stats, month-grouped list, search, track filter
+                      - Export: PDF report with a setup sheet per entry,
+                        ZIP (CSV + photos), CSV
+                      - Backup + restore (merges), installable, offline
+                      - iPhone storage fixes carried over from Receipt Log
+  =================================================================
+-->
+<meta name="theme-color" content="#1f6f5c">
+<meta name="description" content="Log go-kart race nights: results, handling and setup. Works offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=1.0.0">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=1.0.0">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=1.0.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RaceNotes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Chakra+Petch:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eef1f2; --surface:#ffffff; --ink:#15201f; --muted:#5c6b6a; --line:#d5dcdc;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --accent-soft:#dcece7; --danger:#b3372b; --danger-soft:#f6e1de;
+  --font-ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --font-display:"Chakra Petch","Archivo",system-ui,sans-serif;
+  --r:10px; color-scheme:light;
+  --wash:rgba(238,241,242,.62);
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#101716; --surface:#18211f; --ink:#e6eeec; --muted:#93a3a0; --line:#2b3835;
+  --accent:#4cbf9f; --accent-ink:#06231b; --accent-soft:#1d3a32; --danger:#f0806f; --danger-soft:#3b211d; color-scheme:dark;
+  --wash:rgba(16,23,22,.74)}}
+*{box-sizing:border-box}
+html,body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+/* dirt-track photo behind the cards, washed toward the page colour so text on it stays readable;
+   pinned to the screen so it stays put while scrolling */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(var(--wash),var(--wash)),url("brand/track-bg.jpg") 62% 70%/cover no-repeat}
+/* text that sits straight on the photo gets a soft halo in the page colour */
+header .sub,#seasonLabel,.month-head .label,footer>div{text-shadow:0 0 2px var(--bg),0 0 6px var(--bg),0 0 10px var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--font-display);font-size:28px;font-weight:700;letter-spacing:.01em;margin:0;line-height:1.1}
+.sub{color:var(--muted);font-size:13px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.stats-wrap{display:flex;flex-direction:column;gap:6px}
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.totals div{background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.totals .big{font-family:var(--font-display);font-size:24px;font-weight:700;line-height:1.1}
+form.slip{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
+.slip-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sec{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:14px}
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-head h2{font-size:15px;font-weight:700;margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:520px){.grid4{grid-template-columns:1fr 1fr}}
+@media (max-width:440px){.grid2{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+input[type=text],input[type=date],select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 11px;min-height:44px}
+textarea{min-height:76px;resize:vertical}
+input.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,label.btn:focus-within,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-size:13.5px;cursor:pointer;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.photo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.thumb{width:56px;height:56px;border-radius:6px;border:1px solid var(--line);object-fit:cover;cursor:pointer;padding:0;background:var(--bg);overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.btn{font:inherit;font-weight:600;border-radius:8px;padding:10px 14px;min-height:44px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:16px}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.small{min-height:44px;padding:8px 12px;font-size:13.5px}
+.btn:disabled{opacity:.55;cursor:default}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions .primary{flex:1}
+.err{color:var(--danger);font-size:13px}
+.note{font-size:13px;color:var(--muted)}
+.note.ok{color:var(--accent);font-weight:600}
+.gear{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.readout{font-family:var(--font-num);font-variant-numeric:tabular-nums;background:var(--accent-soft);border-radius:8px;padding:9px 12px;min-height:44px;display:flex;flex-direction:column;justify-content:center;line-height:1.15;min-width:84px}
+.readout b{font-size:17px;font-weight:600}
+.readout span{font-family:var(--font-ui);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+/* 2x2 corner grids, laid out like the kart seen from above */
+.kart{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px 30px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:24px 10px 10px}
+.kart::before{content:"";position:absolute;left:50%;top:30px;bottom:14px;width:6px;margin-left:-3px;border-radius:3px;background:var(--line)}
+.kart .front{position:absolute;top:5px;left:0;right:0;text-align:center;font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--muted)}
+.corner{display:flex;flex-direction:column;gap:3px;min-width:0;position:relative}
+.corner .label{font-size:10px}
+.corner input{text-align:center;background:var(--surface);padding:10px 6px}
+.wstats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.wstats div{background:var(--surface);padding:7px 8px;display:flex;flex-direction:column;min-width:0}
+.wstats b{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:14px;font-weight:600}
+.wstats span{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar input{flex:1 1 180px}
+.toolbar select{flex:0 1 190px}
+.month{display:flex;flex-direction:column;gap:6px}
+.month-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 2px}
+.rows{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:11px 12px;border:0;border-top:1px solid var(--line);cursor:pointer;background:transparent;width:100%;text-align:left;font:inherit;color:inherit}
+.row:first-child{border-top:0}
+.row:hover{background:var(--accent-soft)}
+@media (prefers-reduced-motion:no-preference){.row{transition:background .12s}}
+.day{font-family:var(--font-num);font-size:12px;color:var(--muted);line-height:1.2;text-align:center}
+.day b{display:block;font-size:17px;color:var(--ink);font-weight:600}
+.who{min-width:0;display:flex;flex-direction:column;gap:3px}
+.title{font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+.meta{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.fin{font-family:var(--font-display);font-weight:700;font-size:20px;min-width:40px;text-align:right}
+.fin.win{color:var(--accent)}
+.tag{display:inline-block;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--ink);font-size:11.5px;margin-right:4px}
+.tags{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rnum{font-family:var(--font-num);font-size:11.5px;color:var(--muted);margin-right:6px;font-weight:500}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:22px;text-align:center;color:var(--muted)}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--danger-soft);border-radius:8px;padding:10px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
+details.data{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+details.data summary{cursor:pointer;font-weight:600;min-height:24px}
+details.data .inner{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.ex-sum{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.chips .chip.mini{min-height:32px;padding:5px 10px;font-size:12.5px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;min-height:36px;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+/* v1.3.0: tire sets */
+.tire-add{display:flex;gap:8px;flex-wrap:wrap}
+.tire-add input{flex:1 1 150px}
+.tset{background:var(--bg);border:1px solid var(--line);border-radius:8px}
+.tset.retired{opacity:.7}
+.tset-head{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;min-height:44px;background:transparent;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.tset-head .nm{font-weight:700}
+.tset-head .sm{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tset-head .runs{font-family:var(--font-num);font-size:12px;color:var(--muted);white-space:nowrap}
+.tset-body{border-top:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:12px}
+.prep-add{display:grid;grid-template-columns:150px 1fr;gap:8px}
+@media (max-width:440px){.prep-add{grid-template-columns:1fr}}
+.tlog{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tlog-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:6px 6px 6px 10px;border-top:1px solid var(--line)}
+.tlog-row:first-child{border-top:0}
+.tlog-row .d{font-family:var(--font-num);font-size:12px;color:var(--muted);white-space:nowrap}
+.tlog-row .t{overflow-wrap:anywhere}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;background:var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
+footer{color:var(--muted);font-size:12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+footer .brand img{display:block;height:20px;width:auto}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:30;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}
+.viewer img{flex:1;min-height:0;width:100%;object-fit:contain;border:0;border-radius:6px}
+.viewer .actions{justify-content:flex-end;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>RaceNotes</h1>
+      <div class="sub" id="status">Saved on this device</div>
+    </div>
+    <button class="btn small" id="installBtn" type="button" hidden>Install app</button>
+  </header>
+
+  <section class="stats-wrap" aria-label="Season stats">
+    <div class="totals">
+      <div><span class="label">Entries</span><span class="big" id="tCount">0</span></div>
+      <div><span class="label">Feature wins</span><span class="big" id="tWins">0</span></div>
+      <div><span class="label">Best finish</span><span class="big" id="tBest">–</span></div>
+    </div>
+    <div class="sub" id="seasonLabel">This season</div>
+  </section>
+
+  <form class="slip" id="slip" autocomplete="off" novalidate>
+    <div class="slip-head"><strong id="formTitle">New entry</strong><button class="btn small ghost" type="button" id="cancelEdit" hidden>Cancel edit</button></div>
+
+    <div class="grid2">
+      <div class="field"><label class="label" for="date">Date</label><input id="date" type="date"></div>
+      <div class="field"><label class="label" for="track">Track</label><input id="track" type="text" list="trackList" placeholder="Track name" autocapitalize="words"><datalist id="trackList"></datalist></div>
+    </div>
+    <div class="field"><label class="label" for="kclass">Kart class</label><input id="kclass" type="text" list="classList" placeholder="e.g. Clone Heavy" autocapitalize="words"><datalist id="classList"></datalist></div>
+    <div class="field"><span class="label" id="sessLabel">Session</span><div class="chips" id="sessChips" role="group" aria-labelledby="sessLabel"></div></div>
+
+    <div class="sec">
+      <div class="sec-head"><h2>Results</h2></div>
+      <div class="grid4">
+        <div class="field"><label class="label" for="start">Start</label><input id="start" class="num" type="text" inputmode="numeric" placeholder="P"></div>
+        <div class="field"><label class="label" for="finish">Finish</label><input id="finish" class="num" type="text" inputmode="numeric" placeholder="P"></div>
+        <div class="field"><label class="label" for="cars">Cars</label><input id="cars" class="num" type="text" inputmode="numeric"></div>
+        <div class="field"><label class="label" for="bestLap">Best lap (s)</label><input id="bestLap" class="num" type="text" inputmode="decimal" placeholder="12.345"></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><h2 id="handLabel">Handling</h2></div>
+      <div class="chips" id="handChips" role="group" aria-labelledby="handLabel"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><h2>Conditions</h2></div>
+      <div class="field"><span class="label" id="condLabel">Track</span><div class="chips" id="condChips" role="group" aria-labelledby="condLabel"></div></div>
+      <div class="field" style="max-width:160px"><label class="label" for="airTemp">Air temp (°F)</label><input id="airTemp" class="num" type="text" inputmode="decimal"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><h2>Setup</h2><button class="btn small" type="button" id="copySetup">Copy last setup</button></div>
+      <div class="note" id="copyMsg" role="status" hidden></div>
+      <div class="field"><span class="label">Gearing</span>
+        <div class="gear">
+          <div class="field"><label class="sub" for="gDriver">Driver teeth</label><input id="gDriver" class="num" type="text" inputmode="numeric"></div>
+          <div class="field"><label class="sub" for="gDriven">Driven teeth</label><input id="gDriven" class="num" type="text" inputmode="numeric"></div>
+          <div class="readout" aria-live="polite"><span>Ratio</span><b id="ratioOut">–</b></div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><span class="label">Tire pressures (psi)</span>
+          <div class="kart" id="pressGrid"><span class="front">FRONT</span></div></div>
+        <div class="field"><span class="label">Corner weights (lbs)</span>
+          <div class="kart" id="wtGrid"><span class="front">FRONT</span></div></div>
+      </div>
+      <div class="wstats" aria-live="polite">
+        <div><span>Total</span><b id="wTotal">–</b></div>
+        <div><span>Left</span><b id="wLeft">–</b></div>
+        <div><span>Rear</span><b id="wRear">–</b></div>
+        <div><span>Cross</span><b id="wCross">–</b></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label class="label" for="tireSet">Tire set</label><select id="tireSet"><option value="">No set picked</option></select></div>
+        <div class="field"><label class="label" for="tires">Tires / compound</label><input id="tires" type="text" placeholder="e.g. Burris 33 / 60"></div>
+      </div>
+      <div class="field"><label class="label" for="changes">Setup changes</label><textarea id="changes" placeholder="What you changed and why"></textarea></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><h2>Notes &amp; photos</h2></div>
+      <div class="field"><label class="label" for="notes">Notes</label><textarea id="notes" placeholder="How it went, what to try next"></textarea></div>
+      <div class="photo-row" id="photoRow">
+        <label class="btn small" for="photoCam">Take photo</label>
+        <input id="photoCam" type="file" accept="image/*" capture="environment" hidden>
+        <label class="btn small" for="photoFile">Choose photos</label>
+        <input id="photoFile" type="file" accept="image/*" multiple hidden>
+      </div>
+    </div>
+
+    <div class="err" id="formErr" role="alert"></div>
+    <div class="actions">
+      <button class="btn primary" type="submit" id="saveBtn">Save entry</button>
+      <button class="btn danger" type="button" id="deleteBtn" hidden>Delete</button>
+    </div>
+    <div class="confirm" id="confirmDel" hidden>
+      <span>Delete this entry and its photos for good?</span>
+      <button class="btn small danger" type="button" id="confirmYes">Delete</button>
+      <button class="btn small" type="button" id="confirmNo">Keep it</button>
+    </div>
+  </form>
+
+  <section style="display:flex;flex-direction:column;gap:12px" aria-label="Entries">
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search track, class, notes" aria-label="Search entries">
+      <select id="filterTrack" aria-label="Filter by track"><option value="">All tracks</option></select>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <details class="data" id="tirePanel">
+    <summary>Tire sets <span class="sub" id="tireCount"></span></summary>
+    <div class="inner">
+      <div class="sub">Name each set of tires and keep a log of what's been done to them: prep wiped on, soaking, scuffing, anything else. Pick the set on an entry to tie it to that session.</div>
+      <div class="tire-add">
+        <input id="newSetName" type="text" placeholder="Set name, e.g. Set A" aria-label="New tire set name" autocapitalize="words">
+        <input id="newSetComp" type="text" placeholder="Tires / compound (optional)" aria-label="New tire set tires or compound">
+        <button class="btn small" type="button" id="addSet">Add set</button>
+      </div>
+      <div class="err" id="tireErr" role="alert"></div>
+      <div id="tireList" style="display:flex;flex-direction:column;gap:8px"></div>
+      <label class="check" id="retiredWrap" hidden><input type="checkbox" id="showRetired"> Show retired sets</label>
+      <datalist id="prepList"></datalist>
+    </div>
+  </details>
+
+  <details class="data" id="exportPanel">
+    <summary>Export</summary>
+    <div class="inner">
+      <div class="grid2">
+        <div class="field"><label class="label" for="exPeriod">Date range</label>
+          <select id="exPeriod">
+            <option value="thisMonth">This month</option><option value="lastMonth">Last month</option>
+            <option value="thisYear" selected>This season (year)</option><option value="lastYear">Last season</option>
+            <option value="all">All entries</option><option value="custom">Custom dates</option>
+          </select></div>
+        <div class="field" id="exCustom" hidden>
+          <span class="label">From – to</span>
+          <div style="display:flex;gap:6px"><input type="date" id="exFrom" aria-label="From date"><input type="date" id="exTo" aria-label="To date"></div>
+        </div>
+      </div>
+      <div class="field"><span class="label" id="exTrackLabel">Tracks</span><div class="chips" id="exTracks" role="group" aria-labelledby="exTrackLabel"></div></div>
+      <div class="field"><span class="label" id="exSessLabel">Sessions</span><div class="chips" id="exSess" role="group" aria-labelledby="exSessLabel"></div></div>
+      <div class="ex-sum" id="exSummary">No entries in this range.</div>
+      <div class="actions">
+        <button class="btn primary" type="button" id="exPdf">PDF report</button>
+        <button class="btn small" type="button" id="exZip">CSV + photos (ZIP)</button>
+        <button class="btn small" type="button" id="exCsv">CSV only</button>
+      </div>
+      <div class="sub" id="exMsg" role="status"></div>
+    </div>
+  </details>
+
+  <details class="data">
+    <summary>Backup &amp; restore</summary>
+    <div class="inner">
+      <div class="sub">Entries are stored only on this device. Make a backup now and then, and use it to move your notes to another phone or computer. Restoring adds and updates entries; it never deletes any.</div>
+      <div class="actions">
+        <button class="btn small" type="button" id="backupBtn">Download backup</button>
+        <label class="btn small" for="restoreFile">Restore from backup</label>
+        <input id="restoreFile" type="file" accept=".json,application/json" hidden>
+      </div>
+      <div class="sub" id="dataMsg"></div>
+    </div>
+  </details>
+
+  <footer>
+    <picture class="brand">
+      <source srcset="brand/logo-horizontal-white.svg" media="(prefers-color-scheme: dark)">
+      <img src="brand/logo-horizontal.svg" alt="Austin Bergquist" width="202" height="20">
+    </picture>
+    <div>RaceNotes <span id="ver">v1.3.0</span></div>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="viewer" id="viewer" hidden>
+  <div class="actions"><button class="btn small danger" type="button" id="viewerRemove" style="background:var(--surface)">Remove photo</button><button class="btn small" type="button" id="viewerClose">Close</button></div>
+  <div id="viewerBody" style="flex:1;min-height:0;display:flex"></div>
+</div>
+
+<script>
+// Show startup errors on screen (helps diagnose phone-specific problems)
+window.addEventListener("error",function(e){var s=document.getElementById("status");if(s){s.style.color="#b3372b";s.textContent="Error: "+(e.message||"script failed")+(e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")}});
+</script>
+<script>
+(function(){
+"use strict";
+const APP_VERSION="1.3.0";
+const SESSIONS=["Practice","Heat","Feature","Test"];
+const HANDLING=["Tight entry","Tight center","Tight exit","Loose entry","Loose center","Loose exit","Good"];
+const CONDS=["Heavy","Tacky","Dry-slick","Wet"];
+const CORNERS=["lf","rf","lr","rr"], CNAME={lf:"Left front",rf:"Right front",lr:"Left rear",rr:"Right rear"};
+const $=id=>document.getElementById(id);
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+/* ---------- On-device storage (IndexedDB) ---------- */
+let idb=null, idbOpening=null;
+// v1.3.0: database version 2 adds the "tires" store; existing entries and photos carry over untouched
+function openDB(){return new Promise((ok,bad)=>{const r=indexedDB.open("racenotes",2);
+  r.onupgradeneeded=()=>{const d=r.result;["entries","files","tires"].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:"id"})})};
+  r.onsuccess=()=>{const d=r.result;
+    // iOS Safari can close the connection behind our back (e.g. after the camera opens): forget it so the next call reopens
+    d.onclose=()=>{if(idb===d)idb=null};d.onversionchange=()=>{d.close();if(idb===d)idb=null};ok(d)};
+  r.onerror=()=>bad(r.error);r.onblocked=()=>bad(new Error("database blocked"))})}
+async function getDB(){if(idb)return idb;if(!idbOpening)idbOpening=openDB().then(d=>{idb=d;return d}).finally(()=>{idbOpening=null});return idbOpening}
+function run(d,store,mode,fn){return new Promise((ok,bad)=>{const t=d.transaction(store,mode);const s=t.objectStore(store);const res=fn(s);
+  t.oncomplete=()=>ok(res&&res.result!==undefined?res.result:undefined);t.onerror=()=>bad(t.error);t.onabort=()=>bad(t.error||new Error("aborted"))})}
+// Reopen and retry once when the browser has closed the database
+async function tx(store,mode,fn){
+  try{return await run(await getDB(),store,mode,fn)}
+  catch(e){
+    const closed=e&&(e.name==="InvalidStateError"||/closing|closed|connection/i.test(String(e.message||e)));
+    if(!closed)throw e;
+    try{idb&&idb.close()}catch(_){} idb=null;
+    return run(await getDB(),store,mode,fn);
+  }
+}
+const getAll=store=>tx(store,"readonly",s=>s.getAll());
+const getOne=(store,id)=>tx(store,"readonly",s=>s.get(id));
+const put=(store,v)=>tx(store,"readwrite",s=>s.put(v));
+const del=(store,id)=>tx(store,"readwrite",s=>s.delete(id));
+// Photos are stored as raw bytes (some iOS versions refuse to store Blobs)
+async function putFile(id,blob){await put("files",{id,mime:blob.type||"image/jpeg",data:await blob.arrayBuffer()})}
+function fileBlob(f){return f.blob||new Blob([f.data],{type:f.mime||"image/jpeg"})}
+
+let entries=[], editingId=null;
+let tireSets=[];            // v1.3.0: [{id, name, compound, retired, log:[{id, date, text}], createdAt, updatedAt}]
+let photos=[];              // [{id, blob, isNew}]
+let removedPhotoIds=[];
+const pick={session:new Set(),handling:new Set(),cond:new Set()};
+
+function remember(k,v){try{localStorage.setItem("rn_"+k,v)}catch(e){}}
+function recall(k){try{return localStorage.getItem("rn_"+k)}catch(e){return null}}
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2400)}
+
+/* ---------- Numbers + setup math ---------- */
+// "" -> null, not a number -> NaN
+function num(s){const t=String(s==null?"":s).trim().replace(",",".");if(!t)return null;return /^\d*\.?\d+$|^\d+\.$/.test(t)?parseFloat(t):NaN}
+const pct=x=>(x*100).toFixed(1)+"%";
+const lapTxt=x=>x==null?"":(+x).toFixed(3);
+const pos=x=>x==null?"–":"P"+x;
+const gearTxt=e=>e.gearDriver==null&&e.gearDriven==null?"":(e.gearDriver==null?"?":e.gearDriver)+"-"+(e.gearDriven==null?"?":e.gearDriven);
+function gearRatio(e){return e.gearDriver>0&&e.gearDriven>0?e.gearDriven/e.gearDriver:null}
+// An entry keeps the set's name from when it was saved, so it still reads right if the set is deleted later
+const setById=id=>tireSets.find(s=>s.id===id);
+const setName=e=>{if(!e.tireSetId)return "";const s=setById(e.tireSetId);return s?s.name:(e.tireSetName||"")};
+// prep notes on a set up to a date, newest first
+const prepUpTo=(s,date)=>(s&&s.log||[]).filter(l=>!date||l.date<=date).sort((a,b)=>b.date.localeCompare(a.date));
+function weightStats(w){
+  if(!w||CORNERS.some(k=>!(w[k]>0)))return null;
+  const t=w.lf+w.rf+w.lr+w.rr;
+  return {total:t,left:(w.lf+w.lr)/t,rear:(w.lr+w.rr)/t,cross:(w.rf+w.lr)/t};
+}
+
+/* ---------- Form ---------- */
+function chipGroup(box,opts,set,mode){
+  box.innerHTML="";
+  opts.forEach(o=>{const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=o;
+    b.setAttribute("aria-pressed",String(set.has(o)));
+    b.onclick=()=>{
+      if(set.has(o))set.delete(o);
+      else if(mode==="multi"){
+        // "Good" means no handling problem, so it doesn't mix with the others
+        if(o==="Good")set.clear();else set.delete("Good");
+        set.add(o);
+      }else{set.clear();set.add(o)}
+      chipGroup(box,opts,set,mode)};
+    box.appendChild(b)});
+}
+function drawChips(){chipGroup($("sessChips"),SESSIONS,pick.session);chipGroup($("handChips"),HANDLING,pick.handling,"multi");chipGroup($("condChips"),CONDS,pick.cond)}
+
+function buildKart(box,prefix,what,mode){
+  CORNERS.forEach(k=>{const d=document.createElement("div");d.className="corner";
+    d.innerHTML='<label class="label"></label><input type="text" class="num">';
+    const l=d.querySelector("label"),i=d.querySelector("input");
+    l.textContent=k.toUpperCase();i.id=prefix+k;l.htmlFor=i.id;i.inputMode=mode;i.setAttribute("aria-label",CNAME[k]+" "+what);
+    box.appendChild(d)});
+}
+buildKart($("pressGrid"),"p","tire pressure","decimal");
+buildKart($("wtGrid"),"w","corner weight","decimal");
+
+function calc(){
+  const r=gearRatio({gearDriver:num($("gDriver").value),gearDriven:num($("gDriven").value)});
+  $("ratioOut").textContent=r&&isFinite(r)?r.toFixed(2):"–";
+  const w={};CORNERS.forEach(k=>w[k]=num($("w"+k).value));
+  const s=weightStats(w);
+  $("wTotal").textContent=s?s.total.toFixed(1):"–";
+  $("wLeft").textContent=s?pct(s.left):"–";$("wRear").textContent=s?pct(s.rear):"–";$("wCross").textContent=s?pct(s.cross):"–";
+}
+["gDriver","gDriven"].concat(CORNERS.map(k=>"w"+k)).forEach(id=>$(id).addEventListener("input",calc));
+
+const TEXT_FIELDS=["track","kclass","tires","changes","notes"];
+const NUM_FIELDS={start:"Start",finish:"Finish",cars:"Cars",bestLap:"Best lap",airTemp:"Air temp",gDriver:"Driver teeth",gDriven:"Driven teeth"};
+function setVal(id,v){$(id).value=v==null?"":String(v)}
+
+function resetForm(keep){
+  editingId=null;
+  TEXT_FIELDS.concat(Object.keys(NUM_FIELDS)).forEach(id=>setVal(id,""));
+  CORNERS.forEach(k=>{setVal("p"+k,"");setVal("w"+k,"")});
+  $("track").value=recall("track")||""; $("kclass").value=recall("class")||"";
+  const lastSet=setById(recall("tireSet")); fillTireSelect(lastSet&&!lastSet.retired?lastSet.id:"");
+  if(!keep) $("date").value=today();
+  pick.session.clear();pick.handling.clear();pick.cond.clear();drawChips();
+  photos=[]; removedPhotoIds=[]; showPhotos(); $("formErr").textContent=""; copyMsg("");
+  $("formTitle").textContent="New entry"; $("saveBtn").textContent="Save entry";
+  $("cancelEdit").hidden=true; $("deleteBtn").hidden=true; $("confirmDel").hidden=true;
+  calc();
+}
+async function startEdit(e){
+  editingId=e.id;
+  $("date").value=e.date; setVal("track",e.track); setVal("kclass",e.kartClass);
+  setVal("start",e.start); setVal("finish",e.finish); setVal("cars",e.cars); setVal("bestLap",e.bestLap==null?"":lapTxt(e.bestLap));
+  setVal("airTemp",e.airTemp); setVal("gDriver",e.gearDriver); setVal("gDriven",e.gearDriven);
+  CORNERS.forEach(k=>{setVal("p"+k,e.press&&e.press[k]);setVal("w"+k,e.weights&&e.weights[k])});
+  setVal("tires",e.tires); setVal("changes",e.setupChanges); setVal("notes",e.notes); fillTireSelect(e.tireSetId||"");
+  pick.session=new Set(e.session?[e.session]:[]); pick.handling=new Set(e.handling||[]); pick.cond=new Set(e.trackCond?[e.trackCond]:[]); drawChips();
+  photos=[]; removedPhotoIds=[];
+  for(const id of e.photoIds||[]){const f=await getOne("files",id).catch(()=>null);if(f)photos.push({id,blob:fileBlob(f),isNew:false})}
+  showPhotos(); calc(); copyMsg("");
+  $("formTitle").textContent="Edit entry "+rnum(e); $("saveBtn").textContent="Save changes";
+  $("cancelEdit").hidden=false; $("deleteBtn").hidden=false; $("confirmDel").hidden=true; $("formErr").textContent="";
+  $("slip").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
+}
+
+$("cancelEdit").onclick=()=>resetForm();
+$("deleteBtn").onclick=()=>{$("confirmDel").hidden=false};
+$("confirmNo").onclick=()=>{$("confirmDel").hidden=true};
+$("confirmYes").onclick=async()=>{
+  if(!editingId)return; const e=entries.find(x=>x.id===editingId);
+  try{await del("entries",editingId);for(const id of (e&&e.photoIds)||[])await del("files",id);toast("Entry deleted");resetForm();await load()}
+  catch(err){$("formErr").textContent="Couldn't delete: "+err}
+};
+
+$("slip").addEventListener("submit",async ev=>{
+  ev.preventDefault();
+  const err=m=>{$("formErr").textContent=m};
+  if(!$("date").value)return err("Pick the date of the session.");
+  const n={};
+  for(const [id,name] of Object.entries(NUM_FIELDS)){n[id]=num($(id).value);if(Number.isNaN(n[id])){$(id).focus();return err(name+" should be a number.")}}
+  for(const id of ["start","finish","cars","gDriver","gDriven"])if(n[id]!=null&&(n[id]%1||n[id]<1)){$(id).focus();return err(NUM_FIELDS[id]+" should be a whole number.")}
+  if(n.cars!=null&&((n.start||0)>n.cars||(n.finish||0)>n.cars)){$("cars").focus();return err("Start and finish can't be higher than the number of cars.")}
+  const press={},weights={};
+  for(const k of CORNERS){press[k]=num($("p"+k).value);weights[k]=num($("w"+k).value);
+    if(Number.isNaN(press[k])){$("p"+k).focus();return err(CNAME[k]+" pressure should be a number.")}
+    if(Number.isNaN(weights[k])){$("w"+k).focus();return err(CNAME[k]+" weight should be a number.")}}
+  const old=editingId?entries.find(x=>x.id===editingId):null;
+  const now=new Date().toISOString();
+  const e={id:editingId||uid(),num:old&&old.num?old.num:nextNum(),date:$("date").value,
+    track:$("track").value.trim(),kartClass:$("kclass").value.trim(),session:[...pick.session][0]||"",
+    start:n.start,finish:n.finish,cars:n.cars,bestLap:n.bestLap,
+    handling:HANDLING.filter(h=>pick.handling.has(h)),trackCond:[...pick.cond][0]||"",airTemp:n.airTemp,
+    gearDriver:n.gDriver,gearDriven:n.gDriven,press,weights,
+    tireSetId:$("tireSet").value||null,tireSetName:$("tireSet").value?(setById($("tireSet").value)||{}).name||"":"",
+    tires:$("tires").value.trim(),setupChanges:$("changes").value.trim(),notes:$("notes").value.trim(),
+    photoIds:photos.map(p=>p.id),createdAt:old?old.createdAt:now,updatedAt:now};
+  $("saveBtn").disabled=true;
+  try{
+    for(const p of photos)if(p.isNew)await putFile(p.id,p.blob);
+    await put("entries",e);
+    for(const id of removedPhotoIds)if(!e.photoIds.includes(id))await del("files",id);
+    if(e.track)remember("track",e.track); if(e.kartClass)remember("class",e.kartClass); remember("tireSet",e.tireSetId||"");
+    toast(editingId?"Changes saved":"Saved "+rnum(e)+(e.track?" · "+e.track:""));
+    resetForm(!editingId); await load();
+  }catch(x){
+    err(/quota/i.test(String(x))?"This device is out of storage space. Download a backup, then delete old entries or photos.":"Couldn't save: "+x);
+  }finally{$("saveBtn").disabled=false}
+});
+
+/* ---------- Copy last setup ---------- */
+const hasSetup=e=>e.gearDriver!=null||e.gearDriven!=null||e.tires||e.tireSetId||CORNERS.some(k=>(e.press&&e.press[k]!=null)||(e.weights&&e.weights[k]!=null));
+function copyMsg(t,ok){const m=$("copyMsg");m.hidden=!t;m.textContent=t||"";m.className="note"+(ok?" ok":"")}
+$("copySetup").onclick=()=>{
+  const t=$("track").value.trim(),tl=t.toLowerCase();
+  // entries are kept newest first, so the first match is the most recent
+  const pool=entries.filter(e=>e.id!==editingId&&hasSetup(e));
+  const src=t?pool.find(e=>(e.track||"").toLowerCase()===tl):pool[0];
+  if(!src)return copyMsg(t?"No earlier setup saved at "+t+". Clear the track to copy your most recent setup from any track.":"No earlier setup to copy yet.");
+  setVal("gDriver",src.gearDriver);setVal("gDriven",src.gearDriven);
+  CORNERS.forEach(k=>{setVal("p"+k,src.press&&src.press[k]);setVal("w"+k,src.weights&&src.weights[k])});
+  setVal("tires",src.tires);calc();
+  // v1.3.0: the tire set comes along too, unless it has since been retired or deleted
+  const ss=setById(src.tireSetId),setOk=ss&&!ss.retired;
+  if(setOk)fillTireSelect(ss.id);
+  copyMsg("Copied gearing, pressures, weights"+(setOk?", tires and tire set ("+ss.name+")":" and tires")+" from "+rnum(src)+" · "+fmtDate(src.date)+(src.track?" · "+src.track:"")+(src.session?" ("+src.session+")":"")+(t?"":" — most recent at any track")+"."+
+    (ss&&ss.retired?" "+ss.name+" is retired, so no set was picked.":""),true);
+};
+
+/* ---------- Tire sets (v1.3.0): named sets with a dated prep log ---------- */
+let openSetId=null;
+const bySetName=(a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:"base"});
+const runsOn=s=>entries.filter(e=>e.tireSetId===s.id);
+function fillTireSelect(selected){
+  const sel=$("tireSet");sel.length=1;
+  const list=tireSets.filter(s=>!s.retired||s.id===selected).sort(bySetName);
+  list.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.name+(s.compound?" · "+s.compound:"")+(s.retired?" (retired)":"");sel.appendChild(o)});
+  sel.value=list.some(s=>s.id===selected)?selected:"";
+}
+$("tireSet").addEventListener("change",()=>{
+  // picking a set fills the tires box when it's empty
+  const s=setById($("tireSet").value);if(s&&s.compound&&!$("tires").value.trim())$("tires").value=s.compound;
+});
+async function saveSet(s){s.updatedAt=new Date().toISOString();await put("tires",s);
+  const i=tireSets.findIndex(x=>x.id===s.id);if(i<0)tireSets.push(s);else tireSets[i]=s}
+const nameTaken=(name,exceptId)=>tireSets.some(s=>s.id!==exceptId&&s.name.trim().toLowerCase()===name.trim().toLowerCase());
+const tireErr=m=>{$("tireErr").textContent=m||""};
+$("addSet").onclick=async()=>{
+  const name=$("newSetName").value.trim();
+  if(!name){$("newSetName").focus();return tireErr("Give the set a name, like Set A or Rears #2.")}
+  if(nameTaken(name))return tireErr("You already have a set called "+name+".");
+  const now=new Date().toISOString();
+  const s={id:uid(),name,compound:$("newSetComp").value.trim(),retired:false,log:[],createdAt:now,updatedAt:now};
+  try{await saveSet(s)}catch(e){return tireErr("Couldn't save: "+e)}
+  $("newSetName").value="";$("newSetComp").value="";tireErr("");openSetId=s.id;
+  renderTires();fillTireSelect($("tireSet").value);toast("Added "+name);
+};
+$("newSetName").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("addSet").click()}});
+$("showRetired").addEventListener("change",renderTires);
+function el(tag,cls,text){const x=document.createElement(tag);if(cls)x.className=cls;if(text!=null)x.textContent=text;return x}
+function renderTires(){
+  const box=$("tireList");box.innerHTML="";
+  const active=tireSets.filter(s=>!s.retired).length,retired=tireSets.length-active;
+  $("tireCount").textContent=tireSets.length?"· "+active+" active":"";
+  $("retiredWrap").hidden=!retired;
+  // past prep notes become suggestions, so a product you use every week is one tap away
+  const seen=new Set();$("prepList").innerHTML="";
+  tireSets.flatMap(s=>s.log||[]).sort((a,b)=>b.date.localeCompare(a.date)).forEach(l=>{const k=l.text.toLowerCase();if(seen.has(k)||seen.size>=30)return;seen.add(k);
+    const o=document.createElement("option");o.value=l.text;$("prepList").appendChild(o)});
+  const shown=tireSets.filter(s=>!s.retired||$("showRetired").checked).sort((a,b)=>(a.retired-b.retired)||bySetName(a,b));
+  if(!tireSets.length){box.appendChild(el("div","empty","No tire sets yet. Add one above, then log each prep as you do it."));return}
+  shown.forEach(s=>{
+    const runs=runsOn(s),last=prepUpTo(s)[0],isOpen=openSetId===s.id;
+    const card=el("div","tset"+(s.retired?" retired":""));
+    const head=el("button","tset-head");head.type="button";head.setAttribute("aria-expanded",String(isOpen));
+    const left=el("div");left.style.minWidth="0";
+    const nm=el("div","nm",s.name);if(s.retired)nm.appendChild(el("span","badge","retired"));
+    left.append(nm,el("div","sm",[s.compound,last?"Last prep "+fmtShort(last.date)+": "+last.text:"No prep logged"].filter(Boolean).join(" · ")));
+    head.append(left,el("span","runs",runs.length+" session"+(runs.length===1?"":"s")));
+    head.onclick=()=>{openSetId=isOpen?null:s.id;tireErr("");renderTires()};
+    card.appendChild(head);
+    if(isOpen)card.appendChild(setBody(s,runs));
+    box.appendChild(card);
+  });
+}
+const fmtShort=d=>new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+function setBody(s,runs){
+  const body=el("div","tset-body");
+  // name + compound, saved when you leave the box
+  const g=el("div","grid2");
+  const fld=(label,val,ph,onSave)=>{const f=el("div","field"),l=el("label","label",label),i=el("input");i.type="text";i.value=val||"";i.placeholder=ph;
+    i.id="ts_"+label.replace(/\W/g,"")+"_"+s.id;l.htmlFor=i.id;i.addEventListener("change",()=>onSave(i));f.append(l,i);return f};
+  g.append(fld("Set name",s.name,"Set name",async i=>{const v=i.value.trim();
+      if(!v){i.value=s.name;return tireErr("A set needs a name.")}
+      if(nameTaken(v,s.id)){i.value=s.name;return tireErr("You already have a set called "+v+".")}
+      s.name=v;await saveSet(s);tireErr("");renderTires();fillTireSelect($("tireSet").value);render()}),
+    fld("Tires / compound",s.compound,"e.g. Burris 33",async i=>{s.compound=i.value.trim();await saveSet(s);renderTires();fillTireSelect($("tireSet").value)}));
+  body.appendChild(g);
+  // add a prep note
+  const pf=el("div","field");pf.appendChild(el("span","label","Add prep note"));
+  const pa=el("div","prep-add");
+  const d=el("input");d.type="date";d.value=today();d.setAttribute("aria-label","Prep date");
+  const t=el("input");t.type="text";t.placeholder="e.g. Wiped Prep X on rights, 2 coats";t.setAttribute("list","prepList");t.setAttribute("aria-label","What was done");
+  pa.append(d,t);
+  const addBtn=el("button","btn small","Add note");addBtn.type="button";
+  addBtn.onclick=async()=>{const txt=t.value.trim();
+    if(!txt){t.focus();return tireErr("Write what was done, like the prep and how many coats.")}
+    if(!d.value)return tireErr("Pick the date of the prep.");
+    s.log=(s.log||[]).concat({id:uid(),date:d.value,text:txt});
+    try{await saveSet(s)}catch(e){return tireErr("Couldn't save: "+e)}
+    tireErr("");renderTires();toast("Prep note added to "+s.name)};
+  t.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addBtn.click()}});
+  pf.append(pa);body.append(pf,addBtn);addBtn.style.alignSelf="flex-start";
+  // the log, newest first; delete needs a second tap
+  const log=prepUpTo(s);
+  const lw=el("div","field");lw.appendChild(el("span","label","Prep log"+(log.length?" · "+log.length:"")));
+  if(!log.length)lw.appendChild(el("div","sub","Nothing logged yet."));
+  else{const box=el("div","tlog");
+    log.forEach(l=>{const row=el("div","tlog-row");row.append(el("span","d",fmtShort(l.date)+" "+l.date.slice(0,4)),el("span","t",l.text));
+      const x=el("button","btn small ghost","Delete");x.type="button";x.setAttribute("aria-label","Delete prep note from "+fmtDate(l.date));
+      x.onclick=async()=>{if(x.dataset.arm!=="1"){x.dataset.arm="1";x.textContent="Delete?";x.classList.add("danger");return}
+        s.log=s.log.filter(y=>y.id!==l.id);await saveSet(s);renderTires();toast("Prep note deleted")};
+      row.appendChild(x);box.appendChild(row)});
+    lw.appendChild(box)}
+  body.appendChild(lw);
+  // sessions run on this set
+  if(runs.length){const r=el("div","sub");r.textContent="Run in "+runs.slice(0,6).map(e=>rnum(e)+" ("+fmtShort(e.date)+(e.track?", "+e.track:"")+")").join(", ")+(runs.length>6?" and "+(runs.length-6)+" more":"")+".";body.appendChild(r)}
+  // retire / delete
+  const acts=el("div","actions");
+  const ret=el("button","btn small",s.retired?"Bring back":"Retire set");ret.type="button";
+  ret.onclick=async()=>{s.retired=!s.retired;await saveSet(s);if(s.retired&&!$("showRetired").checked)openSetId=null;renderTires();fillTireSelect($("tireSet").value);toast(s.name+(s.retired?" retired":" is back"))};
+  const delb=el("button","btn small danger","Delete set");delb.type="button";
+  const conf=el("div","confirm");conf.hidden=true;
+  conf.append(el("span",null,"Delete "+s.name+" and its prep log for good?"+(runs.length?(runs.length===1?" The 1 entry that used it keeps":" The "+runs.length+" entries that used it keep")+" its name.":"")));
+  const yes=el("button","btn small danger","Delete");yes.type="button";const no=el("button","btn small","Keep it");no.type="button";
+  yes.onclick=async()=>{try{
+      // entries that ran on it keep its current name (it may have been renamed since they were saved)
+      for(const e of runs)if(e.tireSetName!==s.name){e.tireSetName=s.name;await put("entries",e)}
+      await del("tires",s.id)}catch(e){return tireErr("Couldn't delete: "+e)}
+    tireSets=tireSets.filter(x=>x.id!==s.id);openSetId=null;renderTires();fillTireSelect($("tireSet").value);render();toast(s.name+" deleted")};
+  no.onclick=()=>{conf.hidden=true};delb.onclick=()=>{conf.hidden=false};
+  conf.append(yes,no);acts.append(ret,delb);body.append(acts,conf);
+  return body;
+}
+
+/* ---------- Photos ---------- */
+function shrink(file,max){return new Promise(res=>{
+  const img=new Image(),u=URL.createObjectURL(file);
+  img.onload=()=>{const s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement("canvas");
+    c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(u);c.toBlob(b=>res(b||file),"image/jpeg",0.82)};
+  img.onerror=()=>{URL.revokeObjectURL(u);res(file)};img.src=u})}
+const urls=new Map();
+function objUrl(blob){if(!urls.has(blob))urls.set(blob,URL.createObjectURL(blob));return urls.get(blob)}
+function showPhotos(){
+  const row=$("photoRow");row.querySelectorAll(".thumb").forEach(t=>t.remove());
+  $("photoCam").value="";$("photoFile").value="";
+  photos.forEach((p,i)=>{const b=document.createElement("button");b.type="button";b.className="thumb";b.setAttribute("aria-label","View photo "+(i+1));
+    const im=document.createElement("img");im.alt="";im.src=objUrl(p.blob);b.appendChild(im);b.onclick=()=>openViewer(i);
+    row.insertBefore(b,row.querySelector("label"))});
+}
+async function addPhotos(input){
+  const fs=[...input.files].filter(f=>/^image\//.test(f.type)||/\.(jpe?g|png|heic|webp)$/i.test(f.name));
+  if(!fs.length){input.value="";return}
+  for(const f of fs)photos.push({id:uid(),blob:await shrink(f,1600),isNew:true});
+  showPhotos();
+}
+$("photoCam").addEventListener("change",()=>addPhotos($("photoCam")));
+$("photoFile").addEventListener("change",()=>addPhotos($("photoFile")));
+let viewing=-1;
+function openViewer(i){
+  viewing=i;const body=$("viewerBody");body.innerHTML="";
+  const im=document.createElement("img");im.src=objUrl(photos[i].blob);im.alt="Photo "+(i+1);body.appendChild(im);
+  $("viewer").hidden=false;$("viewerClose").focus();
+}
+function closeViewer(){$("viewer").hidden=true;$("viewerBody").innerHTML="";viewing=-1}
+$("viewerClose").onclick=closeViewer;
+$("viewerRemove").onclick=()=>{
+  if(viewing<0)return;const [p]=photos.splice(viewing,1);if(!p.isNew)removedPhotoIds.push(p.id);
+  closeViewer();showPhotos();toast("Photo removed — save to keep the change");
+};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("viewer").hidden)closeViewer()});
+
+/* ---------- List ---------- */
+$("search").addEventListener("input",render); $("filterTrack").addEventListener("change",render);
+// Every entry gets a number (RN-0001…) that ties CSV rows, PDF pages and photo files together
+const rnum=e=>e&&e.num?"RN-"+String(e.num).padStart(4,"0"):"";
+const nextNum=()=>entries.reduce((m,e)=>Math.max(m,e.num||0),0)+1;
+const byNewest=(a,b)=>b.date.localeCompare(a.date)||(b.num||0)-(a.num||0);
+async function load(){
+  entries=await getAll("entries");
+  const missing=entries.filter(e=>!e.num).sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt).localeCompare(String(b.createdAt)));
+  if(missing.length){let n=entries.reduce((m,e)=>Math.max(m,e.num||0),0);for(const e of missing){e.num=++n;await put("entries",e)}}
+  entries.sort(byNewest);
+  tireSets=await getAll("tires");
+  // a new entry starts on the set you used last, as long as it's still in use
+  if(!editingId&&!$("tireSet").value){const l=setById(recall("tireSet"));fillTireSelect(l&&!l.retired?l.id:"")}else fillTireSelect($("tireSet").value);
+  render(); renderTires(); drawExFilters(); exUpdate();
+}
+const tracks=()=>[...new Set(entries.map(e=>e.track).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+const isWin=e=>e.session==="Feature"&&e.finish===1;
+function fillList(id,vals){const l=$(id);l.innerHTML="";vals.forEach(v=>{const o=document.createElement("option");o.value=v;l.appendChild(o)})}
+function render(){
+  const y=String(new Date().getFullYear()),season=entries.filter(e=>e.date.startsWith(y));
+  $("seasonLabel").textContent=y+" season";
+  $("tCount").textContent=season.length;
+  $("tWins").textContent=season.filter(isWin).length;
+  const fins=season.map(e=>e.finish).filter(x=>x!=null);
+  $("tBest").textContent=fins.length?pos(Math.min(...fins)):"–";
+  const ts=tracks();
+  fillList("trackList",ts);
+  fillList("classList",[...new Set(entries.map(e=>e.kartClass).filter(Boolean))].sort());
+  const ft=$("filterTrack"),cur=ft.value;ft.length=1;ts.forEach(t=>{const o=document.createElement("option");o.value=t;o.textContent=t;ft.appendChild(o)});ft.value=ts.includes(cur)?cur:"";
+  const q=$("search").value.trim().toLowerCase(),fv=ft.value;
+  const shown=entries.filter(e=>(!fv||e.track===fv)&&(!q||[rnum(e),e.track,e.kartClass,e.session,e.trackCond,gearTxt(e),setName(e),e.tires,e.setupChanges,e.notes,(e.handling||[]).join(" ")].join(" ").toLowerCase().includes(q)));
+  const list=$("list");list.innerHTML="";
+  if(!entries.length){list.innerHTML='<div class="empty">Your sessions will show up here, newest first, grouped by month. Fill in the form above and tap <b>Save entry</b>.</div>';return}
+  if(!shown.length){list.innerHTML='<div class="empty">No entries match that search.</div>';return}
+  const groups={};shown.forEach(e=>{(groups[e.date.slice(0,7)]=groups[e.date.slice(0,7)]||[]).push(e)});
+  const wrap=document.createElement("div");wrap.style.cssText="display:flex;flex-direction:column;gap:16px";
+  Object.keys(groups).sort().reverse().forEach(k=>{
+    const es=groups[k],[yy,mm]=k.split("-");
+    const sec=document.createElement("div");sec.className="month";
+    const h=document.createElement("div");h.className="month-head";
+    h.innerHTML='<span class="label"></span><span class="label"></span>';
+    const w=es.filter(isWin).length;
+    h.children[0].textContent=MONTHS[+mm-1]+" "+yy+" · "+es.length;h.children[1].textContent=w?w+" feature win"+(w===1?"":"s"):"";
+    const box=document.createElement("div");box.className="rows";
+    es.forEach(e=>{
+      const b=document.createElement("button");b.type="button";b.className="row";const d=new Date(e.date+"T12:00:00");
+      b.innerHTML='<div class="day"><b></b><span></span></div><div class="who"><div class="title"><span class="rnum"></span><span class="tn"></span></div><div class="meta"></div><div class="tags"></div></div><div class="fin"></div>';
+      b.querySelector(".day b").textContent=d.getDate();b.querySelector(".day span").textContent=d.toLocaleDateString("en-US",{weekday:"short"});
+      b.querySelector(".rnum").textContent=rnum(e);
+      b.querySelector(".tn").textContent=[e.track||"(no track)",e.session,e.kartClass].filter(Boolean).join(" · ");
+      // v1.1.0: gears as teeth (11-64) instead of the ratio, plus track condition and air temp
+      const s=weightStats(e.weights),meta=b.querySelector(".meta");
+      const bits=[[gearTxt(e),1],[setName(e),0],[e.trackCond,0],[e.airTemp!=null?e.airTemp+"°F":"",1],[s?"Cross "+pct(s.cross):"",1],
+        [e.bestLap!=null?lapTxt(e.bestLap)+"s":"",1],[(e.photoIds||[]).length?"📷 "+e.photoIds.length:"",0]].filter(x=>x[0]);
+      // each item keeps its leading "·" so a wrapped line never starts with a dangling separator
+      bits.forEach(([t,isNum],i)=>{if(i)meta.appendChild(document.createTextNode(" "));const sp=document.createElement("span");sp.textContent=(i?"· ":"")+t;sp.style.whiteSpace="nowrap";if(isNum)sp.className="num";meta.appendChild(sp)});
+      meta.hidden=!bits.length;
+      const tg=b.querySelector(".tags");(e.handling||[]).forEach(t=>{const s=document.createElement("span");s.className="tag";s.textContent=t;tg.appendChild(s)});tg.hidden=!(e.handling||[]).length;
+      const fin=b.querySelector(".fin");fin.textContent=e.finish!=null?"P"+e.finish:"–";if(isWin(e))fin.classList.add("win");
+      b.setAttribute("aria-label",rnum(e)+", "+fmtDate(e.date)+", "+b.querySelector(".tn").textContent+(e.finish!=null?", finished P"+e.finish:"")+". Edit");
+      b.onclick=()=>startEdit(e);box.appendChild(b);
+    });
+    sec.append(h,box);wrap.appendChild(sec);
+  });
+  list.appendChild(wrap);
+}
+
+/* ---------- Export: date range, filters, PDF report / ZIP / CSV ---------- */
+function saveFile(name,blob){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+const pad2=n=>String(n).padStart(2,"0");
+const ymd=x=>x.getFullYear()+"-"+pad2(x.getMonth()+1)+"-"+pad2(x.getDate());
+const fmtDate=s=>new Date(s+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+const exSel={track:null,session:null};   // null = all
+function drawFilter(box,all,key){
+  box.innerHTML="";
+  const mk=(label,pressed,on)=>{const b=document.createElement("button");b.type="button";b.className="chip mini";b.textContent=label;
+    b.setAttribute("aria-pressed",String(pressed));b.onclick=()=>{on();drawExFilters();exUpdate()};box.appendChild(b)};
+  mk("All",!exSel[key],()=>{exSel[key]=null});
+  all.forEach(x=>mk(x,!!exSel[key]&&exSel[key].has(x),()=>{
+    const s=exSel[key];
+    if(!s)exSel[key]=new Set([x]);            // from "All", tapping one picks just that one
+    else if(s.has(x)){s.delete(x);if(!s.size)exSel[key]=null}
+    else{s.add(x);if(s.size===all.length)exSel[key]=null}
+  }));
+}
+function drawExFilters(){
+  const ts=tracks();
+  if(exSel.track){[...exSel.track].forEach(t=>{if(!ts.includes(t))exSel.track.delete(t)});if(!exSel.track.size)exSel.track=null}
+  drawFilter($("exTracks"),ts,"track");drawFilter($("exSess"),SESSIONS,"session");
+  $("exTracks").parentElement.hidden=!ts.length;
+}
+function exRange(){
+  const v=$("exPeriod").value,t=new Date(),y=t.getFullYear(),m=t.getMonth();
+  const d=(Y,M,D)=>ymd(new Date(Y,M,D));
+  const R={thisMonth:[d(y,m,1),d(y,m+1,0)],lastMonth:[d(y,m-1,1),d(y,m,0)],thisYear:[d(y,0,1),d(y,11,31)],lastYear:[d(y-1,0,1),d(y-1,11,31)],
+    all:["0000-01-01","9999-12-31"],custom:[$("exFrom").value||"0000-01-01",$("exTo").value||"9999-12-31"]}[v];
+  let label;
+  if(v==="all")label="All entries";
+  else if(v==="thisYear"||v==="lastYear")label=R[0].slice(0,4)+" season";
+  else if(v==="custom"&&!$("exFrom").value&&!$("exTo").value)label="All dates";
+  else label=(R[0]==="0000-01-01"?"Start":fmtDate(R[0]))+" – "+(R[1]==="9999-12-31"?"today":fmtDate(R[1]));
+  const slug=v==="all"?"all":(R[0]==="0000-01-01"?"start":R[0])+"_to_"+(R[1]==="9999-12-31"?today():R[1]);
+  return {from:R[0],to:R[1],label,slug};
+}
+function exSelected(){
+  const {from,to}=exRange();
+  return entries.filter(e=>e.date>=from&&e.date<=to&&(!exSel.track||exSel.track.has(e.track))&&(!exSel.session||exSel.session.has(e.session)))
+    .sort((a,b)=>a.date.localeCompare(b.date)||(a.num||0)-(b.num||0));
+}
+function exFilterText(){
+  return ["Tracks: "+(exSel.track?[...exSel.track].join(", "):"all"),"Sessions: "+(exSel.session?SESSIONS.filter(s=>exSel.session.has(s)).join(", "):"all")];
+}
+function summarize(sel){
+  const fins=sel.map(e=>e.finish).filter(x=>x!=null);
+  return {n:sel.length,wins:sel.filter(isWin).length,best:fins.length?Math.min(...fins):null,
+    photos:sel.reduce((a,e)=>a+(e.photoIds||[]).length,0),tracks:new Set(sel.map(e=>e.track).filter(Boolean)).size};
+}
+function exUpdate(){
+  if(!$("exSummary"))return;
+  const sel=exSelected(),s=summarize(sel);
+  $("exSummary").textContent=sel.length?(s.n+" entr"+(s.n===1?"y":"ies")+" · "+s.wins+" feature win"+(s.wins===1?"":"s")+" · best "+pos(s.best)+" · "+s.photos+" photo"+(s.photos===1?"":"s")+" · "+exRange().label):"No entries match. "+exRange().label;
+  ["exPdf","exZip","exCsv"].forEach(id=>$(id).disabled=!sel.length);
+}
+$("exPeriod").addEventListener("change",()=>{$("exCustom").hidden=$("exPeriod").value!=="custom";exUpdate()});
+["exFrom","exTo"].forEach(id=>$(id).addEventListener("change",exUpdate));
+
+const slugify=s=>(String(s||"").normalize("NFKD").replace(/[^\w\s-]/g,"").trim().replace(/[\s_]+/g,"-").slice(0,32))||"track";
+function photoNames(e){const ids=e.photoIds||[];return ids.map((id,i)=>rnum(e)+"_"+e.date+"_"+slugify(e.track)+(ids.length>1?"_"+(i+1):"")+".jpg")}
+function buildCsv(sel){
+  const esc=v=>{v=v==null?"":String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=[["Entry #","Date","Track","Class","Session","Start","Finish","Cars","Best lap (s)","Handling","Track condition","Air temp (F)",
+    "Driver teeth","Driven teeth","Ratio","LF psi","RF psi","LR psi","RR psi","LF lbs","RF lbs","LR lbs","RR lbs","Total lbs","Left %","Rear %","Cross %",
+    "Tire set","Tires","Tire prep (up to this session)","Setup changes","Notes","Photo files"]]
+    .concat(sel.map(e=>{const r=gearRatio(e),s=weightStats(e.weights),p=e.press||{},w=e.weights||{};
+      return [rnum(e),e.date,e.track,e.kartClass,e.session,e.start,e.finish,e.cars,e.bestLap==null?"":lapTxt(e.bestLap),(e.handling||[]).join("; "),e.trackCond,e.airTemp,
+        e.gearDriver,e.gearDriven,r?r.toFixed(2):"",p.lf,p.rf,p.lr,p.rr,w.lf,w.rf,w.lr,w.rr,
+        s?s.total.toFixed(1):"",s?(s.left*100).toFixed(1):"",s?(s.rear*100).toFixed(1):"",s?(s.cross*100).toFixed(1):"",
+        setName(e),e.tires,prepUpTo(setById(e.tireSetId),e.date).map(l=>l.date+" "+l.text).join("; "),e.setupChanges,e.notes,photoNames(e).join("; ")]}));
+  return "﻿"+rows.map(r=>r.map(esc).join(",")).join("\r\n");   // BOM so Excel reads it as UTF-8
+}
+async function saveOut(name,blob){
+  // phones: offer the share sheet (save to Files/Drive, email…); fall back to a normal download
+  try{
+    const file=new File([blob],name,{type:blob.type});
+    if(matchMedia("(pointer:coarse)").matches&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return "shared"}
+  }catch(e){if(e&&e.name==="AbortError")return "cancelled"}
+  saveFile(name,blob);return "saved";
+}
+function exBusy(on,msg){["exPdf","exZip","exCsv"].forEach(id=>$(id).disabled=on);$("exMsg").textContent=msg||"";if(!on)exUpdate()}
+async function photoBlob(id){const f=await getOne("files",id).catch(()=>null);return f?fileBlob(f):null}
+const abs=p=>new URL(p,location.href).href;
+const scripts={};
+function loadScript(src){return scripts[src]||(scripts[src]=new Promise((ok,bad)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>{delete scripts[src];bad(new Error("couldn't load "+src.split("/").pop()))};document.head.appendChild(s)}))}
+
+$("exCsv").onclick=async()=>{
+  const sel=exSelected();if(!sel.length)return;
+  const res=await saveOut("racenotes_"+exRange().slug+".csv",new Blob([buildCsv(sel)],{type:"text/csv"}));
+  $("exMsg").textContent=res==="cancelled"?"":"CSV ready: "+sel.length+" entries. The Photo files column names each entry's photos in the ZIP export.";
+};
+$("exZip").onclick=async()=>{
+  const sel=exSelected();if(!sel.length)return;
+  exBusy(true,"Building ZIP…");
+  try{
+    await loadScript(abs("vendor/jszip/jszip.min.js"));
+    const zip=new JSZip(),folder=zip.folder("photos");let n=0;
+    for(const e of sel){const names=photoNames(e);for(let i=0;i<names.length;i++){const b=await photoBlob(e.photoIds[i]);if(b){folder.file(names[i],b);n++}}}
+    zip.file("racenotes.csv",buildCsv(sel));
+    const blob=await zip.generateAsync({type:"blob",mimeType:"application/zip"});
+    const res=await saveOut("racenotes_"+exRange().slug+".zip",blob);
+    exBusy(false,res==="cancelled"?"":"ZIP ready: racenotes.csv plus "+n+" photo"+(n===1?"":"s")+" named by entry number.");
+  }catch(e){exBusy(false,"Couldn't build the ZIP: "+(e.message||e))}
+};
+
+// ---- PDF report ----
+function blobToImage(b){return new Promise((ok,bad)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=bad;i.src=objUrl(b)})}
+async function toJpeg(blob){
+  const img=await blobToImage(blob);const s=Math.min(1,1400/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);
+  const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+  return {data:c.toDataURL("image/jpeg",0.8),w:c.width,h:c.height};
+}
+// Reports carry the symbol only (no personal name), so they suit anyone using the app
+async function symbolPng(){
+  try{const img=await new Promise((ok,bad)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=bad;i.src=abs("brand/symbol.svg")});
+    const c=document.createElement("canvas");c.width=192;c.height=192;c.getContext("2d").drawImage(img,0,0,192,192);return c.toDataURL("image/png")}catch(e){return null}
+}
+$("exPdf").onclick=async()=>{
+  const sel=exSelected();if(!sel.length)return;
+  exBusy(true,"Building PDF…");
+  try{
+    await loadScript(abs("vendor/jspdf/jspdf.umd.min.js"));
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:"pt",format:"letter"});
+    const W=612,H=792,M=48,INK=[21,32,31],MUT=[92,107,106],GRN=[31,111,92],LN=[213,220,220],BG=[238,241,242],SOFT=[220,236,231];
+    const col=c=>doc.setTextColor(c[0],c[1],c[2]),stroke=c=>doc.setDrawColor(c[0],c[1],c[2]),fill=c=>doc.setFillColor(c[0],c[1],c[2]);
+    const fit=(t,w)=>{t=String(t||"");if(doc.getTextWidth(t)<=w)return t;while(t.length&&doc.getTextWidth(t+"…")>w)t=t.slice(0,-1);return t+"…"};
+    const rng=exRange(),st=summarize(sel);
+    // header
+    const sym=await symbolPng();
+    if(sym)doc.addImage(sym,"PNG",M,M-4,28,28);
+    doc.setFont("helvetica","bold");doc.setFontSize(20);col(INK);doc.text("Race report",M+(sym?38:0),M+17);
+    let y=M+52;
+    doc.setFontSize(10);col(MUT);
+    [["Period",rng.label],["Filters",exFilterText().join(" · ")],["Generated",fmtDate(today())]].forEach(([k,v])=>{
+      doc.setFont("helvetica","bold");doc.text(k,M,y);doc.setFont("helvetica","normal");
+      const lines=doc.splitTextToSize(v,W-2*M-70);doc.text(lines,M+70,y);y+=14*lines.length});
+    // summary band
+    y+=8;fill(BG);doc.rect(M,y,W-2*M,54,"F");
+    const stat=(x,label,val)=>{doc.setFontSize(8);col(MUT);doc.setFont("helvetica","bold");doc.text(label.toUpperCase(),x,y+18);
+      doc.setFont("courier","bold");doc.setFontSize(16);col(INK);doc.text(val,x,y+40)};
+    stat(M+14,"Entries",String(st.n));stat(M+114,"Feature wins",String(st.wins));stat(M+228,"Best finish",pos(st.best));
+    stat(M+334,"Tracks",String(st.tracks));stat(M+424,"Photos",String(st.photos));
+    y+=78;
+    // by track: best finish and best lap only compare within a track
+    const byT={};sel.forEach(e=>{const k=e.track||"(no track)";const t=byT[k]=byT[k]||{n:0,wins:0,best:null,lap:null};t.n++;if(isWin(e))t.wins++;
+      if(e.finish!=null&&(t.best==null||e.finish<t.best))t.best=e.finish;if(e.bestLap!=null&&(t.lap==null||e.bestLap<t.lap))t.lap=e.bestLap});
+    doc.setFont("helvetica","bold");doc.setFontSize(12);col(INK);doc.text("By track",M,y);y+=16;
+    doc.setFontSize(8);col(MUT);doc.text("TRACK",M,y);doc.text("ENTRIES",M+220,y);doc.text("FEATURE WINS",M+280,y);doc.text("BEST FINISH",M+360,y);doc.text("BEST LAP",W-M,y,{align:"right"});
+    stroke(INK);doc.line(M,y+5,W-M,y+5);
+    Object.entries(byT).sort((a,b)=>b[1].n-a[1].n).forEach(([k,v])=>{
+      y+=16;if(y>H-70){doc.addPage();y=M+10}
+      doc.setFont("helvetica","normal");doc.setFontSize(10);col(INK);doc.text(fit(k,210),M,y);
+      doc.setFont("courier","normal");doc.text(String(v.n),M+220,y);doc.text(String(v.wins),M+280,y);
+      doc.setFont("courier","bold");doc.text(pos(v.best),M+360,y);doc.text(v.lap==null?"–":lapTxt(v.lap),W-M,y,{align:"right"});
+      stroke(LN);doc.line(M,y+5,W-M,y+5)});
+    y+=36;
+    // entries table
+    const X={no:M,date:M+50,track:M+110,sess:M+214,cls:M+266,st:M+340,fin:M+366,cars:M+380,lap:M+446,ratio:M+480,cross:W-M};
+    const head=()=>{doc.setFont("helvetica","bold");doc.setFontSize(7.5);col(MUT);
+      doc.text("NO.",X.no,y);doc.text("DATE",X.date,y);doc.text("TRACK",X.track,y);doc.text("SESSION",X.sess,y);doc.text("CLASS",X.cls,y);
+      doc.text("ST",X.st,y);doc.text("FIN",X.fin,y);doc.text("CARS",X.cars,y);doc.text("BEST LAP",X.lap,y,{align:"right"});doc.text("RATIO",X.ratio,y,{align:"right"});doc.text("CROSS",X.cross,y,{align:"right"});
+      stroke(INK);doc.line(M,y+5,W-M,y+5);y+=17};
+    if(y>H-110){doc.addPage();y=M+10}
+    doc.setFont("helvetica","bold");doc.setFontSize(12);col(INK);doc.text("Entries",M,y);y+=18;head();
+    const refs=[];
+    sel.forEach(e=>{
+      if(y>H-70){doc.addPage();y=M+10;head()}
+      const r=gearRatio(e),s=weightStats(e.weights);
+      refs.push({e,page:doc.getCurrentPageInfo().pageNumber,y});
+      doc.setFontSize(8.5);doc.setFont("helvetica","normal");col(INK);doc.text(e.date,X.date,y);doc.text(fit(e.track||"–",98),X.track,y);
+      col(MUT);doc.text(fit(e.session||"–",48),X.sess,y);doc.text(fit(e.kartClass||"–",68),X.cls,y);
+      doc.setFont("courier","normal");col(INK);doc.text(e.start==null?"–":String(e.start),X.st,y);
+      doc.setFont("courier","bold");doc.text(e.finish==null?"–":"P"+e.finish,X.fin,y);
+      doc.setFont("courier","normal");doc.text(e.cars==null?"–":String(e.cars),X.cars,y);
+      doc.text(e.bestLap==null?"–":lapTxt(e.bestLap),X.lap,y,{align:"right"});doc.text(r?r.toFixed(2):"–",X.ratio,y,{align:"right"});doc.text(s?pct(s.cross):"–",X.cross,y,{align:"right"});
+      if((e.handling||[]).length){y+=11;doc.setFont("helvetica","italic");doc.setFontSize(7.5);col(MUT);doc.text(fit(e.handling.join(", "),W-2*M-110),X.track,y)}
+      stroke(LN);doc.line(M,y+5,W-M,y+5);y+=16;
+    });
+    // one setup sheet per entry, with its photos
+    const kartBox=(x,y0,title,vals,unit)=>{
+      doc.setFont("helvetica","bold");doc.setFontSize(10);col(INK);doc.text(title,x,y0);
+      const cw=104,ch=36,gx=28,gy=10,top=y0+22;
+      doc.setFont("helvetica","bold");doc.setFontSize(6.5);col(MUT);doc.text("FRONT",x+cw+gx/2,y0+14,{align:"center"});
+      fill(LN);doc.roundedRect(x+cw+gx/2-3,top+6,6,ch*2+gy-12,3,3,"F");
+      CORNERS.forEach((k,i)=>{const cx=x+(i%2)*(cw+gx),cy=top+Math.floor(i/2)*(ch+gy);
+        fill(BG);stroke(LN);doc.roundedRect(cx,cy,cw,ch,4,4,"FD");
+        doc.setFont("helvetica","bold");doc.setFontSize(6.5);col(MUT);doc.text(k.toUpperCase(),cx+6,cy+10);
+        doc.setFont("courier","bold");doc.setFontSize(14);col(INK);doc.text(vals[k]==null?"–":String(vals[k]),cx+cw/2,cy+25,{align:"center"});
+        if(vals[k]!=null){doc.setFont("helvetica","normal");doc.setFontSize(7);col(MUT);doc.text(unit,cx+cw-6,cy+30,{align:"right"})}});
+      return top+ch*2+gy;
+    };
+    const para=(label,text)=>{
+      if(!text)return;
+      doc.setFontSize(9.5);const lines=doc.splitTextToSize(text,W-2*M);
+      if(y+20+lines.length*12>H-50){doc.addPage();y=M+10}
+      doc.setFont("helvetica","bold");doc.setFontSize(8);col(MUT);doc.text(label.toUpperCase(),M,y);y+=13;
+      doc.setFont("helvetica","normal");doc.setFontSize(9.5);col(INK);
+      lines.forEach(l=>{if(y>H-50){doc.addPage();y=M+10}doc.text(l,M,y);y+=12});y+=8;
+    };
+    let done=0;
+    for(const ref of refs){
+      const e=ref.e,r=gearRatio(e),s=weightStats(e.weights);
+      $("exMsg").textContent="Adding setup sheets… "+(++done)+" of "+refs.length;
+      doc.addPage();ref.target=doc.getCurrentPageInfo().pageNumber;y=M+6;
+      doc.setFont("courier","bold");doc.setFontSize(12);col(GRN);doc.text(rnum(e),M,y);
+      doc.setFont("helvetica","bold");doc.setFontSize(15);col(INK);doc.text(fit(e.track||"(no track)",320),M+72,y);
+      doc.setFont("helvetica","normal");doc.setFontSize(9.5);col(MUT);
+      doc.text([fmtDate(e.date),e.session,e.kartClass].filter(Boolean).join(" · "),M+72,y+15);
+      doc.setFont("helvetica","bold");doc.setFontSize(26);col(isWin(e)?GRN:INK);doc.text(e.finish==null?"–":"P"+e.finish,W-M,y+8,{align:"right"});
+      if(e.cars!=null){doc.setFont("helvetica","normal");doc.setFontSize(8);col(MUT);doc.text("of "+e.cars,W-M,y+20,{align:"right"})}
+      y+=32;stroke(LN);doc.line(M,y,W-M,y);y+=12;
+      // results band
+      fill(BG);doc.rect(M,y,W-2*M,46,"F");
+      const cell=(x,label,val)=>{doc.setFont("helvetica","bold");doc.setFontSize(7.5);col(MUT);doc.text(label.toUpperCase(),x,y+16);
+        doc.setFont("courier","bold");doc.setFontSize(14);col(INK);doc.text(val,x,y+35)};
+      cell(M+12,"Start",pos(e.start));cell(M+112,"Finish",pos(e.finish));cell(M+212,"Cars",e.cars==null?"–":String(e.cars));
+      cell(M+312,"Best lap",e.bestLap==null?"–":lapTxt(e.bestLap)+"s");cell(M+422,"Air temp",e.airTemp==null?"–":e.airTemp+"°F");
+      y+=62;
+      // conditions, handling, gearing, tires
+      const kv=(k,v,x,w)=>{doc.setFont("helvetica","bold");doc.setFontSize(8);col(MUT);doc.text(k.toUpperCase(),x,y);
+        doc.setFont("helvetica","normal");doc.setFontSize(10);col(INK);doc.text(fit(v||"–",w),x,y+14)};
+      kv("Track condition",e.trackCond,M,150);kv("Handling",(e.handling||[]).join(", "),M+170,W-2*M-170);y+=34;
+      kv("Gearing",e.gearDriver!=null||e.gearDriven!=null?(e.gearDriver==null?"?":e.gearDriver)+" / "+(e.gearDriven==null?"?":e.gearDriven)+" teeth":"",M,150);
+      kv("Ratio",r?r.toFixed(2):"",M+170,100);kv("Tire set / compound",[setName(e),e.tires].filter(Boolean).join(" · "),M+290,W-2*M-290);y+=40;
+      // corner grids
+      const bottom=kartBox(M,y,"Tire pressures",e.press||{},"psi");
+      kartBox(M+270,y,"Corner weights",e.weights||{},"lbs");
+      y=bottom+16;
+      if(s){fill(SOFT);doc.rect(M,y-12,W-2*M,20,"F");
+        doc.setFont("helvetica","bold");doc.setFontSize(8);col(MUT);doc.text("WEIGHTS",M+8,y+1);
+        doc.setFont("courier","bold");doc.setFontSize(9.5);col(INK);
+        doc.text("Total "+s.total.toFixed(1)+" lbs  ·  Left "+pct(s.left)+"  ·  Rear "+pct(s.rear)+"  ·  Cross "+pct(s.cross),M+62,y+1)}
+      y+=30;
+      // v1.3.0: what had been done to this tire set by the day of the session (newest first, last 6)
+      const prep=prepUpTo(setById(e.tireSetId),e.date);
+      if(prep.length)para("Tire prep on "+setName(e)+(prep.length>6?" (latest 6 of "+prep.length+")":""),prep.slice(0,6).map(l=>fmtDate(l.date)+" — "+l.text).join("\n"));
+      para("Setup changes",e.setupChanges);
+      para("Notes",e.notes);
+      // photos, two across; continue on new pages as needed
+      const ids=e.photoIds||[];const gw=(W-2*M-12)/2,gh=190;let i=0;
+      for(const id of ids){
+        const b=await photoBlob(id);if(!b)continue;let im;try{im=await toJpeg(b)}catch(x){continue}
+        if(i%2===0&&y+gh>H-50){doc.addPage();y=M+6;doc.setFont("courier","bold");doc.setFontSize(10);col(GRN);doc.text(rnum(e)+" photos (continued)",M,y);y+=14}
+        if(i===0){doc.setFont("helvetica","bold");doc.setFontSize(8);col(MUT);doc.text("PHOTOS",M,y);y+=8}
+        const x0=M+(i%2)*(gw+12),sc=Math.min(gw/im.w,gh/im.h),iw=im.w*sc,ih=im.h*sc;
+        fill(BG);doc.rect(x0,y,gw,gh,"F");doc.addImage(im.data,"JPEG",x0+(gw-iw)/2,y+(gh-ih)/2,iw,ih);
+        if(i%2===1)y+=gh+12;i++;
+      }
+    }
+    // link each table row's number to its setup sheet, then footers
+    refs.forEach(ref=>{if(!ref.target)return;doc.setPage(ref.page);doc.setFont("courier","bold");doc.setFontSize(8.5);col(GRN);
+      doc.textWithLink(rnum(ref.e),X.no,ref.y,{pageNumber:ref.target})});
+    const N=doc.getNumberOfPages();
+    for(let i=1;i<=N;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(8);col(MUT);
+      doc.text("RaceNotes v"+APP_VERSION+" · "+rng.label,M,H-24);doc.text("Page "+i+" of "+N,W-M,H-24,{align:"right"})}
+    const res=await saveOut("racenotes-report_"+rng.slug+".pdf",doc.output("blob"));
+    exBusy(false,res==="cancelled"?"":"PDF ready: "+sel.length+" entr"+(sel.length===1?"y":"ies")+", one setup sheet each.");
+  }catch(e){exBusy(false,"Couldn't build the PDF: "+(e.message||e))}
+};
+
+/* ---------- Backup / restore ---------- */
+const b2d=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)});
+$("backupBtn").onclick=async()=>{
+  $("dataMsg").textContent="Building backup…";
+  try{
+    const files=await getAll("files");
+    const out={app:"racenotes",version:APP_VERSION,exportedAt:new Date().toISOString(),entries,tireSets,
+      files:await Promise.all(files.map(async f=>({id:f.id,data:await b2d(fileBlob(f))})))};
+    saveFile("racenotes-backup-"+today()+".json",new Blob([JSON.stringify(out)],{type:"application/json"}));
+    remember("lastBackup",today());
+    $("dataMsg").textContent="Backup downloaded ("+entries.length+" entr"+(entries.length===1?"y":"ies")+", "+files.length+" photo"+(files.length===1?"":"s")+", "+tireSets.length+" tire set"+(tireSets.length===1?"":"s")+").";
+  }catch(e){$("dataMsg").textContent="Couldn't build the backup: "+(e.message||e)}
+};
+$("restoreFile").addEventListener("change",async()=>{
+  const f=$("restoreFile").files[0];$("restoreFile").value="";if(!f)return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(data.app!=="racenotes"||!Array.isArray(data.entries))throw new Error("not a RaceNotes backup");
+    let added=0,updated=0,setsIn=0;
+    for(const fl of data.files||[]){const blob=await (await fetch(fl.data)).blob();await putFile(fl.id,blob)}
+    // v1.3.0: tire sets merge too. The same set from two devices keeps every prep note from both;
+    // name/compound/retired come from whichever copy was edited last. Backups from before v1.3.0 have none.
+    for(const s of data.tireSets||[]){const ex=setById(s.id);
+      if(!ex){if(nameTaken(s.name))s.name+=" (restored)";await put("tires",s);tireSets.push(s);setsIn++;continue}
+      const ids=new Set((ex.log||[]).map(l=>l.id)),extra=(s.log||[]).filter(l=>!ids.has(l.id));
+      const newer=String(s.updatedAt)>String(ex.updatedAt);
+      if(!extra.length&&!newer)continue;
+      const m=Object.assign({},newer?s:ex,{log:(ex.log||[]).concat(extra),updatedAt:newer?s.updatedAt:ex.updatedAt});
+      await put("tires",m);tireSets[tireSets.indexOf(ex)]=m;setsIn++}
+    for(const e of data.entries){const ex=entries.find(x=>x.id===e.id);
+      if(!ex){if(e.num&&entries.some(x=>x.num===e.num))e.num=nextNum();entries.push(e);await put("entries",e);added++}
+      else if(String(e.updatedAt)>String(ex.updatedAt)){e.num=ex.num;await put("entries",e);updated++}}
+    await load();
+    $("dataMsg").textContent="Restored: "+added+" new, "+updated+" updated"+(setsIn?", "+setsIn+" tire set"+(setsIn===1?"":"s")+" added or merged":"")+". Entries already here were kept.";
+  }catch(e){$("dataMsg").textContent="That file couldn't be restored: "+e.message+"."}
+});
+
+/* ---------- Install + offline ---------- */
+let deferred=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;$("installBtn").hidden=false});
+$("installBtn").onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$("installBtn").hidden=true};
+window.addEventListener("appinstalled",()=>{$("installBtn").hidden=true});
+if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+$("ver").textContent="v"+APP_VERSION;
+resetForm();
+(async()=>{
+  try{await getDB()}catch(e){$("status").textContent="This browser blocked on-device storage. Turn off private browsing and reload.";return}
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+  await load();
+})();
+})();
+</script>
+</body>
+</html>
